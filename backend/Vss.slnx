@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Vss.Api.Tests/Vss.Api.Tests.csproj" />
+  <Project Path="Vss.Api/Vss.Api.csproj" />
+  <Project Path="Vss.Domain/Vss.Domain.csproj" />
+  <Project Path="Vss.Infrastructure/Vss.Infrastructure.csproj" />
+</Solution>

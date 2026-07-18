@@ -1,0 +1,28 @@
+# ---- .NET ----
+bin/
+obj/
+*.user
+[Dd]ebug/
+[Rr]elease/
+# Local SQLite dev database
+*.db
+*.db-shm
+*.db-wal
+
+# ---- Node / Vite ----
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# ---- Env / secrets (keep .env.example) ----
+.env
+.env.local
+.env.*.local
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.vs/
+.idea/
+*.log
