@@ -12,9 +12,29 @@ public static class SeedData
     // Stable ids so seeding is idempotent and the dev user can be pre-wired.
     public static readonly Guid NorthstarId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     public static readonly Guid DanaUserId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    public static readonly Guid AcmeId = Guid.Parse("33333333-3333-3333-3333-333333333333");
 
     public static List<Vendor> Vendors() => new()
     {
+        // Live SAP ByDesign test supplier (City of Jacksonville tenant) — the dev user is
+        // pre-linked to this one so the SAP write round-trip is testable from the UI.
+        new Vendor
+        {
+            Id = AcmeId,
+            Number = "62440",
+            Pin = "0000",
+            LegalName = "ACME SPORTS INC",
+            EntityType = "LLC",
+            Status = "Active",
+            RemitStreet = "",
+            RemitCity = "SEYMOUR",
+            RemitState = "IN",
+            RemitZip = "",
+            RemitCountry = "US",
+            PaymentMethod = "ACH / EFT",
+            TaxIdType = "EIN",
+            LastSyncedAt = DateTimeOffset.UtcNow,
+        },
         new Vendor
         {
             Id = NorthstarId,
@@ -95,8 +115,8 @@ public static class SeedData
         CategoryCodes = new() { new() { Code = category } },
     };
 
-    /// <summary>The demo vendor user (Dana Whitfield), seeded Unlinked so the full
-    /// linking flow is demoable before the console/profile screens unlock.</summary>
+    /// <summary>The demo vendor user (Dana Whitfield), pre-linked to the ACME SPORTS INC
+    /// SAP supplier (62440) so the SAP write round-trip is testable straight from the UI.</summary>
     public static VendorUser DanaUser() => new()
     {
         Id = DanaUserId,
@@ -105,7 +125,7 @@ public static class SeedData
         DisplayName = "Dana Whitfield",
         FirstName = "Dana",
         LastName = "Whitfield",
-        LinkState = LinkState.Unlinked,
-        VendorId = null,
+        LinkState = LinkState.Linked,
+        VendorId = AcmeId,
     };
 }

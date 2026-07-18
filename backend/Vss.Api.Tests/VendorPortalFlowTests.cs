@@ -55,11 +55,22 @@ public class VendorPortalFlowTests
 {
     private static VssAppFactory NewApp() => new();
 
+    /// <summary>A client acting as a fresh (JIT-provisioned, unlinked) dev user, so tests
+    /// don't depend on the seeded user's link state.</summary>
+    private static HttpClient FreshClient(VssAppFactory app, string uuid)
+    {
+        var c = app.CreateClient();
+        c.DefaultRequestHeaders.Add("X-Dev-Uuid", uuid);
+        c.DefaultRequestHeaders.Add("X-Dev-Email", $"{uuid}@test.local");
+        c.DefaultRequestHeaders.Add("X-Dev-Name", "Test User");
+        return c;
+    }
+
     [Fact]
     public async Task Unlinked_user_sees_no_vendor()
     {
         using var app = NewApp();
-        var client = app.CreateClient();
+        var client = FreshClient(app, "unlinked-user");
 
         var me = await client.GetFromJsonAsync<MeDto>("/api/v1/me");
 
@@ -72,7 +83,7 @@ public class VendorPortalFlowTests
     public async Task Vendor_cannot_submit_changes_before_linking()
     {
         using var app = NewApp();
-        var client = app.CreateClient();
+        var client = FreshClient(app, "nolink-user");
 
         var res = await client.PostAsJsonAsync("/api/v1/change-requests",
             new ChangeRequestCreateDto("Banking & remittance",
@@ -99,7 +110,7 @@ public class VendorPortalFlowTests
     public async Task Full_flow_link_then_change_then_admin_approve_pushes_to_erp()
     {
         using var app = NewApp();
-        var client = app.CreateClient();
+        var client = FreshClient(app, "flow-user");
 
         // 1. Link by vendor number + PIN.
         var match = await (await client.PostAsJsonAsync("/api/v1/link-requests",
