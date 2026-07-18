@@ -74,15 +74,14 @@ public class SapByDesignErpClientTests
 
         await client.UpdateVendorMasterAsync("V-10485", new VendorMasterPatch
         {
-            Fields = { ["LegalName"] = "Rocky Supply Co.", ["RemitCity"] = "Belgrade" }
+            Fields = { ["LegalName"] = "Rocky Supply Co." }
         });
 
         var body = handler.Calls.Single().Body;
         Assert.Contains("SupplierBundleMaintainRequest_sync_V1", body);
         Assert.Contains("actionCode=\"04\"", body);
         Assert.Contains("<InternalID>V-10485</InternalID>", body);
-        Assert.Contains("Rocky Supply Co.", body);
-        Assert.Contains("Belgrade", body);
+        Assert.Contains("<FirstLineName>Rocky Supply Co.</FirstLineName>", body);
     }
 
     [Fact]

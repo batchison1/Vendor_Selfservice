@@ -31,29 +31,18 @@ internal static class Sap
 
     public static string BuildMaintainBundle(string internalId, IReadOnlyDictionary<string, string?> fields)
     {
+        // Per the Manage WSDL, name fields (FirstLineName/SecondLineName) sit DIRECTLY on
+        // the supplier maintain bundle — there is no Organisation wrapper. actionCode 04 = update.
         var supplier = new XElement("Supplier",
-            new XAttribute("actionCode", "04"), // 04 = save/update
+            new XAttribute("actionCode", "04"),
             new XElement("InternalID", internalId));
 
         if (fields.TryGetValue("LegalName", out var name) && name is not null)
-            supplier.Add(new XElement("Organisation", new XElement("FirstLineName", name)));
+            supplier.Add(new XElement("FirstLineName", name));
 
-        var addr = new XElement("PostalAddress");
-        void AddAddr(string field, string el)
-        {
-            if (fields.TryGetValue(field, out var v) && v is not null) addr.Add(new XElement(el, v));
-        }
-        AddAddr("RemitStreet", "StreetName");
-        AddAddr("RemitCity", "CityName");
-        AddAddr("RemitState", "RegionCode");
-        AddAddr("RemitZip", "StreetPostalCodeText");
-        AddAddr("RemitCountry", "CountryCode");
-        if (addr.HasElements) supplier.Add(new XElement("Address", addr));
-
-        if (fields.TryGetValue("PrimaryEmail", out var email) && email is not null)
-            supplier.Add(new XElement("Communication", new XElement("Email", new XElement("URI", email))));
-
-        // Banking / tax writes are schema-heavy in ByDesign and left for WSDL-confirmed mapping.
+        // Address / contact / banking fields live under nested nodes (AddressInformation,
+        // CommunicationArrangement, PurchasingData, ...) each with their own actionCode.
+        // [TODO: map those against the Manage WSDL as needed — name is wired + verified.]
 
         return Envelope(new XElement(Glob + "SupplierBundleMaintainRequest_sync_V1",
             new XElement("BasicMessageHeader"),
