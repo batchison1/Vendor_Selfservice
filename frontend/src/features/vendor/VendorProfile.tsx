@@ -228,13 +228,17 @@ function readAsBase64(file: File): Promise<string> {
 function DocumentsPanel({ vendor }: { vendor: Vendor }) {
   const qc = useQueryClient();
   const [pending, setPending] = useState<string | null>(null);
+  const [newName, setNewName] = useState("");
   const upload = useMutation({
     mutationFn: async ({ name, file }: { name: string; file: File }) =>
       documents.upload({ name, fileName: file.name, contentType: file.type || "application/pdf", contentBase64: await readAsBase64(file) }),
-    onSuccess: () => Promise.all([
-      qc.invalidateQueries({ queryKey: qk.me }),
-      qc.invalidateQueries({ queryKey: qk.vendor }),
-    ]),
+    onSuccess: () => {
+      setNewName("");
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: qk.me }),
+        qc.invalidateQueries({ queryKey: qk.vendor }),
+      ]);
+    },
     onSettled: () => setPending(null),
   });
 
@@ -249,9 +253,37 @@ function DocumentsPanel({ vendor }: { vendor: Vendor }) {
     input.click();
   };
 
+  const existingNames = new Set(vendor.documents.map((d) => d.name.toLowerCase()));
+  const trimmed = newName.trim();
+  const duplicate = existingNames.has(trimmed.toLowerCase());
+
   const cols = ["Document", "File", "Validity", "Status", ""];
   return (
     <div style={{ padding: "8px 0" }}>
+      {/* New document upload — adds a new document rather than replacing an existing slot. */}
+      <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--border-1)", background: "var(--bg-2)", display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 280px" }}>
+          <Label>Add a new document</Label>
+          <input
+            list="vss-doc-types"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="e.g. Certificate of Insurance"
+            style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--border-1)", borderRadius: 6, fontSize: 13, color: "var(--fg-1)", outline: "none", fontFamily: "var(--font-sans)" }}
+          />
+          <datalist id="vss-doc-types">
+            <option value="W-9" />
+            <option value="Certificate of Insurance" />
+            <option value="Business License" />
+            <option value="Bank Verification Letter" />
+            <option value="Diversity Certification" />
+          </datalist>
+          {duplicate && <div style={{ fontSize: 12, color: "var(--fg-2)", marginTop: 4 }}>A document named “{trimmed}” already exists — uploading will replace it below.</div>}
+        </div>
+        <Button variant="teal" style={{ padding: "9px 16px", fontSize: 13 }} disabled={!trimmed || upload.isPending} onClick={() => pick(trimmed)}>
+          {pending === trimmed && upload.isPending ? "Uploading…" : "+ Upload new document"}
+        </Button>
+      </div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead><tr style={{ background: "var(--bg-2)" }}>
           {cols.map((c) => <th key={c} style={{ padding: "10px 24px", textAlign: "left", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".1em", color: "var(--fg-2)", borderBottom: "1px solid var(--border-1)" }}>{c}</th>)}
@@ -265,7 +297,7 @@ function DocumentsPanel({ vendor }: { vendor: Vendor }) {
               <td style={{ padding: "14px 24px" }}><StatusPill status={d.status} /></td>
               <td style={{ padding: "14px 24px", textAlign: "right" }}>
                 <Button variant="outline" style={{ padding: "7px 14px", fontSize: 13 }} disabled={upload.isPending} onClick={() => pick(d.name)}>
-                  {pending === d.name ? "Uploading…" : "Upload PDF"}
+                  {pending === d.name && upload.isPending ? "Uploading…" : d.fileRef ? "Replace" : "Upload PDF"}
                 </Button>
               </td>
             </tr>
