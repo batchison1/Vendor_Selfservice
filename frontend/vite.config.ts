@@ -14,7 +14,15 @@ export default defineConfig({
       [UDP]: path.resolve(import.meta.dirname, "dev-stubs/udp-react-enterprise-component-library/index.tsx"),
     },
   },
-  server: { port: 5173 },
+  server: {
+    port: 5173,
+    // Proxy API calls to the backend so the app is single-origin (needed when sharing via a
+    // tunnel — the browser only ever talks to the frontend origin). Set
+    // REACT_APP_VSS_API_DOMAIN="" (see .env.local) so client calls are relative "/api/...".
+    proxy: { "/api": "http://localhost:5047" },
+    // Allow the app to be reached through a Cloudflare quick tunnel (temporary external share).
+    allowedHosts: [".trycloudflare.com", "localhost", "127.0.0.1"],
+  },
   // Univerus reads REACT_APP_* via import.meta.env — expose that prefix (plus VITE_).
   envPrefix: ["VITE_", "REACT_APP_"],
 });
