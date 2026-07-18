@@ -1,48 +1,81 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "../../layout/AppShell";
-import { Card, CardHeader, Button, Label, TextField, SelectField, Banner } from "../../ui";
-import { adminApi, type ErpTestResult } from "../../api/adminClient";
+import { Card, CardHeader, Button, Label, TextField, Spinner, Banner } from "../../ui";
+import { adminApi, adminQk, useErpConfig, type ErpConfig, type ErpConfigUpdate, type ErpTestResult } from "../../api/adminClient";
 
-/**
- * ERP integration config. Presentational for now — reflects the connection the
- * backend uses (ConfigService.integrationV2ApiUrl + IErpClient). Wire to a real
- * config endpoint when the UnityErpClient lands.
- */
+// How the connector maps portal fields to the ERP — fixed by the connector implementation.
 const FIELD_MAP = [
-  { vss: "company.legalName", erp: "VENDOR.NAME", dir: "Two-way" },
-  { vss: "banking.routing", erp: "VENDOR.ACH_ROUTING", dir: "VSS → ERP" },
-  { vss: "banking.account", erp: "VENDOR.ACH_ACCT", dir: "VSS → ERP" },
-  { vss: "tax.ein", erp: "VENDOR.TAX_ID", dir: "Two-way" },
-  { vss: "address.remitTo", erp: "VENDOR.REMIT_ADDR", dir: "Two-way" },
-];
-const SYNC_LOG = [
-  { text: "Vendor master pull — 6 records", time: "Today 09:42", color: "var(--status-success)" },
-  { text: "Change pushed to ERP (V-10485)", time: "Today 08:10", color: "var(--color-teal)" },
-  { text: "Token refreshed", time: "Today 06:00", color: "var(--fg-3)" },
+  { vss: "company.legalName", erp: "Supplier/FirstLineName", dir: "Two-way" },
+  { vss: "address.remitTo", erp: "Supplier/Address/PostalAddress", dir: "Two-way" },
+  { vss: "banking.routing", erp: "BankDetails/BankRoutingID", dir: "VSS → ERP" },
+  { vss: "banking.account", erp: "BankDetails/BankAccountID", dir: "VSS → ERP" },
+  { vss: "documents.*", erp: "AttachmentFolder/Document", dir: "VSS → ERP" },
 ];
 
 export function AdminErp() {
+  const qc = useQueryClient();
+  const { data: cfg, isLoading } = useErpConfig();
   const [result, setResult] = useState<ErpTestResult | null>(null);
+  const [form, setForm] = useState<ErpConfig | null>(null);
+
+  useEffect(() => { if (cfg) setForm(cfg); }, [cfg]);
+
   const test = useMutation({ mutationFn: () => adminApi.testErp(), onSuccess: setResult });
+  const save = useMutation({
+    mutationFn: (body: ErpConfigUpdate) => adminApi.saveErpConfig(body),
+    onSuccess: (updated) => { setForm(updated); qc.invalidateQueries({ queryKey: adminQk.erpConfig }); },
+  });
+
+  if (isLoading || !form) return <AppShell title="ERP integration" crumb="Administration"><Spinner /></AppShell>;
+
+  const isSap = form.provider === "SapByDesign";
+  const isBc = form.provider === "BusinessCentral";
+  const isStub = form.provider === "Stub";
+  const set = (k: keyof ErpConfig) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
+  const onSave = () => save.mutate({
+    baseUrl: form.baseUrl, principalId: form.principalId, querySupplierPath: form.querySupplierPath,
+    manageSupplierPath: form.manageSupplierPath, sampleId: form.sampleId, tenantId: form.tenantId, scope: form.scope, companyId: form.companyId,
+  });
 
   return (
     <AppShell title="ERP integration" crumb="Administration">
-      <Banner tone="info">Config shown is the interface the backend uses (`IErpClient`). It's stubbed today; wire to a real config store when `UnityErpClient` is implemented.</Banner>
+      <Banner tone="info">Connection settings are stored in the ERP config table and read by <code>IErpClient</code> at request time. Secrets are not shown or stored here — they come from the deployment's secret store (user-secrets / env).</Banner>
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 20, alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <Card>
             <CardHeader title="Connection profile" />
             <div style={{ padding: 22, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px 22px" }}>
-              <div style={{ gridColumn: "span 2" }}><Label>ERP base URL</Label><TextField defaultValue="https://gateway.unitydev.ca/IntegrationService/api/v2" style={{ fontFamily: "var(--font-mono)" }} /></div>
-              <div><Label>Authentication</Label><SelectField options={["OAuth 2.0 (client credentials)", "API key (header)", "Bearer token"]} /></div>
-              <div><Label>Token endpoint</Label><TextField defaultValue="/oauth/token" style={{ fontFamily: "var(--font-mono)" }} /></div>
-              <div><Label>Client ID</Label><TextField defaultValue="vss-bozeman-prod" style={{ fontFamily: "var(--font-mono)" }} /></div>
-              <div><Label>Client secret</Label><TextField type="password" defaultValue="••••••••••••" style={{ fontFamily: "var(--font-mono)" }} /></div>
+              <div><Label>Provider</Label><TextField value={form.provider} disabled style={{ fontFamily: "var(--font-mono)" }} /></div>
+              <div><Label>Authentication</Label><TextField value={form.authMode} disabled /></div>
+              <div style={{ gridColumn: "span 2" }}><Label>ERP base URL</Label><TextField value={form.baseUrl} onChange={set("baseUrl")} disabled={isStub} style={{ fontFamily: "var(--font-mono)" }} /></div>
+
+              {isSap && <>
+                <div><Label>Technical user</Label><TextField value={form.principalId} onChange={set("principalId")} style={{ fontFamily: "var(--font-mono)" }} /></div>
+                <div><Label>Sample supplier ID</Label><TextField value={form.sampleId} onChange={set("sampleId")} style={{ fontFamily: "var(--font-mono)" }} /></div>
+                <div style={{ gridColumn: "span 2" }}><Label>QuerySupplierIn path</Label><TextField value={form.querySupplierPath} onChange={set("querySupplierPath")} style={{ fontFamily: "var(--font-mono)" }} /></div>
+                <div style={{ gridColumn: "span 2" }}><Label>ManageSupplierIn path</Label><TextField value={form.manageSupplierPath} onChange={set("manageSupplierPath")} style={{ fontFamily: "var(--font-mono)" }} /></div>
+              </>}
+
+              {isBc && <>
+                <div><Label>Client ID</Label><TextField value={form.principalId} onChange={set("principalId")} style={{ fontFamily: "var(--font-mono)" }} /></div>
+                <div><Label>Company ID</Label><TextField value={form.companyId} onChange={set("companyId")} style={{ fontFamily: "var(--font-mono)" }} /></div>
+                <div><Label>Tenant ID</Label><TextField value={form.tenantId} onChange={set("tenantId")} style={{ fontFamily: "var(--font-mono)" }} /></div>
+                <div><Label>Sample vendor no.</Label><TextField value={form.sampleId} onChange={set("sampleId")} style={{ fontFamily: "var(--font-mono)" }} /></div>
+                <div style={{ gridColumn: "span 2" }}><Label>Scope</Label><TextField value={form.scope} onChange={set("scope")} style={{ fontFamily: "var(--font-mono)" }} /></div>
+              </>}
+
+              <div style={{ gridColumn: "span 2" }}>
+                <Label>Secret ({isBc ? "client secret" : "password"})</Label>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 6, background: "var(--bg-2)", fontSize: 13, color: form.secretConfigured ? "#19663F" : "#8A6D00" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 999, background: "currentColor" }} />
+                  {form.secretConfigured ? "Configured via secret store" : "Not configured — set via user-secrets / env"}
+                </div>
+              </div>
             </div>
           </Card>
           <Card>
-            <CardHeader title="Field mapping" />
+            <CardHeader title="Field mapping (connector reference)" />
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr style={{ background: "var(--bg-2)" }}>
                 {["VSS field", "ERP field", "Direction"].map((c) => <th key={c} style={th}>{c}</th>)}
@@ -62,10 +95,11 @@ export function AdminErp() {
         <div style={{ display: "flex", flexDirection: "column", gap: 20, position: "sticky", top: 0 }}>
           <Card style={{ padding: 22 }}>
             <div style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 15, marginBottom: 14 }}>Connection status</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 8, background: "#DFF3E8", color: "#19663F", fontSize: 14, fontWeight: 600 }}><span style={{ width: 9, height: 9, borderRadius: 999, background: "currentColor" }} />Connected · last sync 6m ago</div>
-            <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10, fontSize: 13, color: "var(--fg-2)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}><span>Environment</span><b style={{ color: "var(--fg-1)" }}>Stub (dev)</b></div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}><span>API version</span><b style={{ color: "var(--fg-1)" }}>v2</b></div>
+            <div style={{ marginTop: 2, display: "flex", flexDirection: "column", gap: 10, fontSize: 13, color: "var(--fg-2)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}><span>Provider</span><b style={{ color: "var(--fg-1)" }}>{form.provider}</b></div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}><span>Auth</span><b style={{ color: "var(--fg-1)" }}>{form.authMode}</b></div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}><span>Secret</span><b style={{ color: "var(--fg-1)" }}>{form.secretConfigured ? "Configured" : "Missing"}</b></div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}><span>Last updated</span><b style={{ color: "var(--fg-1)" }}>{form.updatedAt ? new Date(form.updatedAt).toLocaleString() : "—"}</b></div>
             </div>
             <Button variant="outline" style={{ width: "100%", marginTop: 18 }} disabled={test.isPending} onClick={() => test.mutate()}>
               {test.isPending ? "Testing…" : "Test connection"}
@@ -76,16 +110,11 @@ export function AdminErp() {
                 <div style={{ fontWeight: 400, marginTop: 2 }}>{result.message}</div>
               </div>
             )}
-            <Button variant="teal" style={{ width: "100%", marginTop: 10 }}>Save configuration</Button>
-          </Card>
-          <Card style={{ padding: 22 }}>
-            <div style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 15, marginBottom: 12 }}>Recent sync log</div>
-            {SYNC_LOG.map((l) => (
-              <div key={l.text} style={{ display: "flex", gap: 10, padding: "9px 0", borderBottom: "1px solid #F0F1F2" }}>
-                <span style={{ width: 8, height: 8, borderRadius: 999, background: l.color, marginTop: 5, flex: "0 0 8px" }} />
-                <div style={{ fontSize: 13, color: "var(--fg-1)", lineHeight: 1.4 }}>{l.text}<div style={{ fontSize: 11, color: "var(--fg-3)", marginTop: 1 }}>{l.time}</div></div>
-              </div>
-            ))}
+            <Button variant="teal" style={{ width: "100%", marginTop: 10 }} disabled={isStub || save.isPending} onClick={onSave}>
+              {save.isPending ? "Saving…" : "Save configuration"}
+            </Button>
+            {save.isSuccess && <div style={{ marginTop: 8, fontSize: 12, color: "#19663F", textAlign: "center" }}>Saved — applied on the next ERP call.</div>}
+            {save.isError && <div style={{ marginTop: 8, fontSize: 12, color: "#8A231E", textAlign: "center" }}>{(save.error as Error).message}</div>}
           </Card>
         </div>
       </div>

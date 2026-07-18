@@ -16,15 +16,16 @@ namespace Vss.Api.Controllers;
 [ApiController]
 [Route("api/v1/admin")]
 [Authorize(Policy = "Admin")]
-public class AdminController(VssDbContext db, IErpClient erp, IOptions<ErpOptions> erpOptions, IDocumentStore store) : ControllerBase
+public class AdminController(VssDbContext db, IErpClient erp, IOptions<ErpOptions> erpOptions, IDocumentStore store, ErpConfigStore erpConfig) : ControllerBase
 {
     /// <summary>Pings the configured ERP (GetVendor on a sample id) and reports status.</summary>
     [HttpPost("erp/test")]
     public async Task<IActionResult> ErpTest(CancellationToken ct)
     {
         var opt = erpOptions.Value;
-        var sample = opt.Provider.Equals("BusinessCentral", StringComparison.OrdinalIgnoreCase) ? opt.BusinessCentral.SampleVendorNumber
-            : opt.Provider.Equals("SapByDesign", StringComparison.OrdinalIgnoreCase) ? opt.SapByDesign.SampleSupplierId
+        var row = erpConfig.Get();
+        var sample = opt.Provider.Equals("BusinessCentral", StringComparison.OrdinalIgnoreCase) ? row.BcSampleVendorNumber
+            : opt.Provider.Equals("SapByDesign", StringComparison.OrdinalIgnoreCase) ? row.SapSampleSupplierId
             : "V-10485";
 
         var sw = Stopwatch.StartNew();
@@ -45,6 +46,50 @@ public class AdminController(VssDbContext db, IErpClient erp, IOptions<ErpOption
             sw.Stop();
             return Ok(new { provider = opt.Provider, ok = false, latencyMs = sw.ElapsedMilliseconds, message = ex.Message });
         }
+    }
+
+    /// <summary>The editable ERP connection config for the running provider (no secrets).</summary>
+    [HttpGet("erp/config")]
+    public ActionResult<ErpConfigDto> GetErpConfig()
+    {
+        var row = erpConfig.Get();
+        var provider = erpConfig.Provider;
+        var isBc = provider.Equals("BusinessCentral", StringComparison.OrdinalIgnoreCase);
+        var isSap = provider.Equals("SapByDesign", StringComparison.OrdinalIgnoreCase);
+
+        return isBc
+            ? new ErpConfigDto(provider, "OAuth 2.0 (client credentials)", erpConfig.SecretConfigured(),
+                row.BcBaseUrl, row.BcClientId, "", "", row.BcSampleVendorNumber, row.BcTenantId, row.BcScope, row.BcCompanyId, row.UpdatedAt)
+            : new ErpConfigDto(provider, isSap ? "HTTP Basic" : "In-memory stub", erpConfig.SecretConfigured(),
+                row.SapBaseUrl, row.SapUsername, row.SapQuerySupplierPath, row.SapManageSupplierPath, row.SapSampleSupplierId, "", "", "", row.UpdatedAt);
+    }
+
+    /// <summary>Persist the connection config for the running provider. Takes effect on the
+    /// next request (SAP) — secrets are unchanged (set via user-secrets / env).</summary>
+    [HttpPut("erp/config")]
+    public async Task<ActionResult<ErpConfigDto>> UpdateErpConfig(ErpConfigUpdateDto dto, CancellationToken ct)
+    {
+        var row = erpConfig.Get();
+        if (erpConfig.Provider.Equals("BusinessCentral", StringComparison.OrdinalIgnoreCase))
+        {
+            row.BcBaseUrl = dto.BaseUrl.Trim();
+            row.BcClientId = dto.PrincipalId.Trim();
+            row.BcSampleVendorNumber = dto.SampleId.Trim();
+            row.BcTenantId = dto.TenantId.Trim();
+            row.BcScope = dto.Scope.Trim();
+            row.BcCompanyId = dto.CompanyId.Trim();
+        }
+        else
+        {
+            row.SapBaseUrl = dto.BaseUrl.Trim();
+            row.SapUsername = dto.PrincipalId.Trim();
+            row.SapQuerySupplierPath = dto.QuerySupplierPath.Trim();
+            row.SapManageSupplierPath = dto.ManageSupplierPath.Trim();
+            row.SapSampleSupplierId = dto.SampleId.Trim();
+        }
+        row.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return GetErpConfig();
     }
 
     [HttpGet("change-requests")]

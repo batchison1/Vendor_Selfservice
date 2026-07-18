@@ -57,3 +57,22 @@ public record DocumentTypeUpsertDto(string Code, string Description, bool IsActi
 public record AdminLinkRequestDto(Guid Id, string Company, string Email, string Method, string? MatchedVendorNumber, DateTimeOffset CreatedAt, string Status);
 public record AdminVendorDto(string Number, string Name, string Category, DateTimeOffset? LastSync, string Status);
 public record AdminStatsDto(string ErpStatus, int PendingLinks, int PendingChanges, int LinkedVendors);
+
+// ---- ERP configuration (editable connection settings; secrets never returned) ----
+public record ErpConfigDto(
+    string Provider,          // running provider, read-only (chosen at startup)
+    string AuthMode,          // e.g. "HTTP Basic" / "OAuth 2.0 (client credentials)"
+    bool SecretConfigured,    // whether the active provider's secret is set (value never sent)
+    string BaseUrl,
+    string PrincipalId,       // SAP username / BC client id
+    string QuerySupplierPath, // SAP only
+    string ManageSupplierPath,// SAP only
+    string SampleId,          // SAP supplier id / BC vendor number
+    string TenantId,          // BC only
+    string Scope,             // BC only
+    string CompanyId,         // BC only
+    DateTimeOffset? UpdatedAt);
+
+public record ErpConfigUpdateDto(
+    string BaseUrl, string PrincipalId, string QuerySupplierPath, string ManageSupplierPath,
+    string SampleId, string TenantId, string Scope, string CompanyId);

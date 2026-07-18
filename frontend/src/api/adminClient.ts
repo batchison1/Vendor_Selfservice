@@ -35,6 +35,7 @@ export const adminQk = {
   vendors: [VSS_BASE, "api/v1/admin/vendors"],
   change: (id: string) => [VSS_BASE, `api/v1/admin/change-requests/${id}`],
   documentTypes: [VSS_BASE, "api/v1/admin/document-types"],
+  erpConfig: [VSS_BASE, "api/v1/admin/erp/config"],
 };
 
 // ------------------------------------------------------------------ Read hooks
@@ -47,9 +48,20 @@ export const useAdminDocumentTypes = () => useApiQuery<DocumentType[]>(VSS_BASE,
 
 export interface ErpTestResult { provider: string; ok: boolean; latencyMs: number; message: string; }
 
+export interface ErpConfig {
+  provider: string; authMode: string; secretConfigured: boolean;
+  baseUrl: string; principalId: string; querySupplierPath: string; manageSupplierPath: string;
+  sampleId: string; tenantId: string; scope: string; companyId: string; updatedAt?: string | null;
+}
+export type ErpConfigUpdate = Pick<ErpConfig,
+  "baseUrl" | "principalId" | "querySupplierPath" | "manageSupplierPath" | "sampleId" | "tenantId" | "scope" | "companyId">;
+
+export const useErpConfig = () => useApiQuery<ErpConfig>(VSS_BASE, "api/v1/admin/erp/config");
+
 // ------------------------------------------------------------------ Mutations
 export const adminApi = {
   testErp: () => apiMutate<ErpTestResult>(VSS_BASE, "api/v1/admin/erp/test", { method: "POST" }),
+  saveErpConfig: (body: ErpConfigUpdate) => apiMutate<ErpConfig>(VSS_BASE, "api/v1/admin/erp/config", { method: "PUT", body }),
   approveChange: (id: string, note?: string) =>
     apiMutate<void>(VSS_BASE, `api/v1/admin/change-requests/${id}/approve`, { method: "POST", body: { note } }),
   rejectChange: (id: string, note?: string) =>

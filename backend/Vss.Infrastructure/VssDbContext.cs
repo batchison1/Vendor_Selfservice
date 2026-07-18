@@ -15,6 +15,7 @@ public class VssDbContext(DbContextOptions<VssDbContext> options) : DbContext(op
     public DbSet<ChangeDiff> ChangeDiffs => Set<ChangeDiff>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<DocumentType> DocumentTypes => Set<DocumentType>();
+    public DbSet<ErpConfig> ErpConfigs => Set<ErpConfig>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {

@@ -27,6 +27,16 @@ public static class DbInitializer
         await db.SaveChangesAsync(ct);
     }
 
+    /// <summary>Seed the editable ERP config from options if it hasn't been set yet.</summary>
+    public static async Task SeedErpConfigAsync(VssDbContext db, Erp.ErpOptions options, CancellationToken ct = default)
+    {
+        if (!await db.ErpConfigs.AnyAsync(ct))
+        {
+            db.ErpConfigs.Add(Erp.ErpConfigStore.FromOptions(options));
+            await db.SaveChangesAsync(ct);
+        }
+    }
+
     /// <summary>Dev-only: wipe all data and restore canonical seed data.</summary>
     public static async Task ReseedAsync(VssDbContext db, CancellationToken ct = default)
     {

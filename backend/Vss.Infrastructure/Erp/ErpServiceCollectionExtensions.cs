@@ -17,18 +17,11 @@ public static class ErpServiceCollectionExtensions
     {
         services.Configure<ErpOptions>(config.GetSection(ErpOptions.Section));
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<ErpOptions>>().Value.BusinessCentral);
-        services.AddSingleton(sp =>
-        {
-            var o = sp.GetRequiredService<IOptions<ErpOptions>>().Value.SapByDesign;
-            // Dev convenience: read the password from a credentials file if not set directly.
-            if (string.IsNullOrEmpty(o.Password) && !string.IsNullOrWhiteSpace(o.CredentialsFile) && File.Exists(o.CredentialsFile))
-            {
-                var lastLine = File.ReadAllLines(o.CredentialsFile)
-                    .Select(l => l.Trim()).LastOrDefault(l => l.Length > 0);
-                if (lastLine is not null) o.Password = lastLine;
-            }
-            return o;
-        });
+
+        // SAP connection settings come from the editable config store (seeded from options),
+        // so admin edits take effect at request time. Secret still resolved from options.
+        services.AddScoped<ErpConfigStore>();
+        services.AddScoped(sp => sp.GetRequiredService<ErpConfigStore>().EffectiveSap());
 
         var provider = (config.GetSection(ErpOptions.Section)["Provider"] ?? "Stub").Trim().ToLowerInvariant();
         switch (provider)

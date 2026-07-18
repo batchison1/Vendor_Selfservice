@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
+using Microsoft.Extensions.Options;
 using Vss.Api.Auth;
 using Vss.Infrastructure;
 using Vss.Infrastructure.Documents;
@@ -58,6 +59,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<VssDbContext>();
     await DbInitializer.InitializeAsync(db);
+    await DbInitializer.SeedErpConfigAsync(db, scope.ServiceProvider.GetRequiredService<IOptions<ErpOptions>>().Value);
 }
 
 if (app.Environment.IsDevelopment())
