@@ -36,15 +36,11 @@ public class SapByDesignErpClient : IErpClient
 
     public async Task<ErpVendorDto?> MatchVendorAsync(MatchQuery query, CancellationToken ct = default)
     {
-        var envelope = query.Method == "TaxIdZip" && !string.IsNullOrWhiteSpace(query.TaxId)
-            ? Sap.BuildQueryByTaxId(query.TaxId!)
-            : Sap.BuildQueryByInternalId(query.VendorNumber ?? "");
-
-        var dto = ParseSupplier(await PostAsync(_opt.QuerySupplierPath, Sap.QueryAction, envelope, ct));
-        if (dto is null) return null;
-        if (query.Method == "TaxIdZip" && !string.IsNullOrWhiteSpace(query.Zip) && Norm(dto.RemitZip) != Norm(query.Zip))
-            return null;
-        return dto;
+        // QuerySupplierIn selects by supplier number (InternalID); it has no tax-id
+        // selection, so Tax ID + ZIP linking isn't supported here — match by number.
+        if (string.IsNullOrWhiteSpace(query.VendorNumber)) return null;
+        return ParseSupplier(await PostAsync(_opt.QuerySupplierPath, Sap.QueryAction,
+            Sap.BuildQueryByInternalId(query.VendorNumber!), ct));
     }
 
     public async Task UpdateVendorMasterAsync(string vendorNumber, VendorMasterPatch patch, CancellationToken ct = default)
@@ -106,6 +102,5 @@ public class SapByDesignErpClient : IErpClient
     private static string? Local(XElement? root, string localName)
         => root?.Descendants().FirstOrDefault(e => e.Name.LocalName == localName)?.Value;
 
-    private static string Norm(string? s) => (s ?? "").Trim().ToUpperInvariant();
     private static string Truncate(string s) => s.Length > 500 ? s[..500] : s;
 }

@@ -129,10 +129,19 @@ Then **verify connectivity** from the admin **ERP integration** screen → *Test
 (or `POST /api/v1/admin/erp/test`), which pings the configured ERP and reports
 `{provider, ok, latencyMs, message}`.
 
-**Notes / TODO for live wiring:**
-- **SAP ByDesign** SOAP element namespaces + write-side field nesting are tenant/WSDL-specific.
-  They're centralised in `Erp/SapByDesign/Sap.cs` (marked `[TODO]`); confirm against your
-  sandbox WSDL / sample payloads. `QuerySupplierPath` / `ManageSupplierPath` may differ per tenant.
+**Notes for live wiring:**
+- **SAP ByDesign** message shapes are confirmed against a live tenant (City of Jacksonville)
+  and the WSDLs in `Erp/SapByDesign/wsdl/`: request **body** elements are in
+  `http://sap.com/xi/SAPGlobal20/Global`, while the **SOAPAction** uses the `A1S/Global`
+  service namespace; `SelectionByInternalID` filters via `LowerBoundaryIdentifier`
+  (`IntervalBoundaryTypeCode` 1 = equal); Manage uses `MaintainBundle_V1`. **Read/match are
+  verified live; the write (`ManageSupplierIn`) is validated non-destructively via
+  `CheckMaintainBundle_V1`.** The write field mapping in `Sap.cs` currently covers name +
+  address; extend it (banking/tax/contacts) as needed. Matching is by supplier number
+  (InternalID) — Tax ID + ZIP isn't a QuerySupplierIn selection.
+- **Dev credential convenience**: `Erp:SapByDesign:CredentialsFile` — point it at a text file
+  whose last non-empty line is the technical-user password; the app reads it at startup
+  (like a mounted secret). Prefer user-secrets / env / a K8s Secret for real deployments.
 - **Business Central** banking fields (routing/account) aren't on the standard `vendor`
   entity — they live under `vendorBankAccounts` (a second call, currently skipped/TODO).
 - The invitation **PIN** has no ERP equivalent; ERP matching is by vendor number or Tax ID +

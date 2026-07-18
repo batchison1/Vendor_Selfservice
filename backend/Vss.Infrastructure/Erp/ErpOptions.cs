@@ -45,6 +45,14 @@ public class SapByDesignOptions
     public string Username { get; set; } = "";
     public string Password { get; set; } = ""; // secret
 
+    /// <summary>
+    /// Optional dev convenience: path to a text file whose last non-empty line is the
+    /// technical-user password. When <see cref="Password"/> is empty and this file
+    /// exists, the app reads the password from it at startup (like a mounted secret
+    /// file). Prefer user-secrets / env / a K8s Secret for real deployments.
+    /// </summary>
+    public string CredentialsFile { get; set; } = "";
+
     /// <summary>A known supplier InternalID used by the connectivity test.</summary>
     public string SampleSupplierId { get; set; } = "";
 }

@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Vss.Api.Contracts;
 using Vss.Infrastructure;
+using Vss.Infrastructure.Erp;
 using Xunit;
 
 namespace Vss.Api.Tests;
@@ -34,6 +35,12 @@ internal sealed class VssAppFactory : WebApplicationFactory<Program>
                 services.Remove(d);
 
             services.AddDbContext<VssDbContext>(o => o.UseSqlite(_conn));
+
+            // Force the in-memory ERP stub regardless of ambient Erp:Provider config
+            // (e.g. a machine with user-secrets pointing at a real ERP).
+            foreach (var d in services.Where(s => s.ServiceType == typeof(IErpClient)).ToList())
+                services.Remove(d);
+            services.AddSingleton<IErpClient, StubErpClient>();
         });
 
     protected override void Dispose(bool disposing)

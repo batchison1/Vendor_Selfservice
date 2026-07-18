@@ -11,27 +11,22 @@ namespace Vss.Infrastructure.Erp.SapByDesign;
 internal static class Sap
 {
     private static readonly XNamespace Soap = "http://schemas.xmlsoap.org/soap/envelope/";
+    // Confirmed against the COJ WSDLs + a live call: the message BODY elements are in
+    // SAPGlobal20/Global, while the SOAPAction uses the A1S/Global service namespace.
     private static readonly XNamespace Glob = "http://sap.com/xi/SAPGlobal20/Global";
 
-    public const string QueryAction = "http://sap.com/xi/SAPGlobal20/Global/QuerySupplierIn/FindByElementsRequest_sync";
-    public const string ManageAction = "http://sap.com/xi/SAPGlobal20/Global/ManageSupplierIn/MaintainBundleRequest_sync";
+    public const string QueryAction = "http://sap.com/xi/A1S/Global/QuerySupplierIn/FindByElementsRequest";
+    public const string ManageAction = "http://sap.com/xi/A1S/Global/ManageSupplierIn/MaintainBundle_V1Request";
 
+    // SelectionByInternalID has type SelectionByIdentifier, so its boundary element is
+    // LowerBoundaryIdentifier (NOT LowerBoundaryInternalID). IntervalBoundaryTypeCode 1 = equal.
     public static string BuildQueryByInternalId(string internalId) =>
         Envelope(new XElement(Glob + "SupplierByElementsQuery_sync",
             new XElement("SupplierSelectionByElements",
                 new XElement("SelectionByInternalID",
                     new XElement("InclusionExclusionCode", "I"),
                     new XElement("IntervalBoundaryTypeCode", "1"),
-                    new XElement("LowerBoundaryInternalID", internalId))),
-            ProcessingConditions()));
-
-    public static string BuildQueryByTaxId(string taxId) =>
-        Envelope(new XElement(Glob + "SupplierByElementsQuery_sync",
-            new XElement("SupplierSelectionByElements",
-                new XElement("SelectionByPartyTaxID",
-                    new XElement("InclusionExclusionCode", "I"),
-                    new XElement("IntervalBoundaryTypeCode", "1"),
-                    new XElement("LowerBoundaryPartyTaxID", taxId))),
+                    new XElement("LowerBoundaryIdentifier", internalId))),
             ProcessingConditions()));
 
     public static string BuildMaintainBundle(string internalId, IReadOnlyDictionary<string, string?> fields)
@@ -60,7 +55,7 @@ internal static class Sap
 
         // Banking / tax writes are schema-heavy in ByDesign and left for WSDL-confirmed mapping.
 
-        return Envelope(new XElement(Glob + "SupplierBundleMaintainRequest_sync",
+        return Envelope(new XElement(Glob + "SupplierBundleMaintainRequest_sync_V1",
             new XElement("BasicMessageHeader"),
             supplier));
     }

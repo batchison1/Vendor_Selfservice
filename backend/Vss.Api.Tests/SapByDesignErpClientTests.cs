@@ -78,7 +78,7 @@ public class SapByDesignErpClientTests
         });
 
         var body = handler.Calls.Single().Body;
-        Assert.Contains("SupplierBundleMaintainRequest_sync", body);
+        Assert.Contains("SupplierBundleMaintainRequest_sync_V1", body);
         Assert.Contains("actionCode=\"04\"", body);
         Assert.Contains("<InternalID>V-10485</InternalID>", body);
         Assert.Contains("Rocky Supply Co.", body);
