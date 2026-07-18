@@ -21,7 +21,8 @@ export interface Me {
 }
 
 export interface Address {
-  remitStreet: string; remitCity: string; remitState: string; remitZip: string; remitCountry: string; physicalAddress?: string | null;
+  isPoBox: boolean; poBox?: string | null; remitStreet: string; houseNumber?: string | null;
+  remitCity: string; remitState: string; remitZip: string; remitCountry: string; physicalAddress?: string | null;
 }
 export interface Banking {
   paymentMethod: string; bankName?: string | null; routingNumberMasked?: string | null; accountNumberMasked?: string | null; accountType: string;

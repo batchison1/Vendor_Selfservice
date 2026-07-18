@@ -27,32 +27,38 @@ public class VendorController(VssDbContext db, CurrentUser current, IErpClient e
             .FirstOrDefaultAsync(x => x.Id == user.VendorId, ct);
         if (v is null) return NotFound();
 
-        // The ERP is the system of record for payment method and bank data, so refresh those
-        // from it before display — the banking page then loads the vendor's real payment
-        // method (e.g. Check) and current active bank account.
-        await RefreshBankingFromErpAsync(v, ct);
+        // The ERP is the system of record for banking and address, so refresh those before
+        // display — the banking page loads the real payment method + active bank account, and
+        // the addresses page reflects the PO Box / street shape held in the ERP.
+        await RefreshFromErpAsync(v, ct);
         return VendorMapping.ToDto(v);
     }
 
-    private async Task RefreshBankingFromErpAsync(Vendor v, CancellationToken ct)
+    private async Task RefreshFromErpAsync(Vendor v, CancellationToken ct)
     {
         try
         {
-            var erpDto = await erp.GetVendorAsync(v.Number, ct);
-            if (erpDto is null) return;
+            var e = await erp.GetVendorAsync(v.Number, ct);
+            if (e is null) return;
 
-            var changed = false;
-            void Sync(string? incoming, Func<string> get, Action<string> set)
-            {
-                if (!string.IsNullOrEmpty(incoming) && get() != incoming) { set(incoming); changed = true; }
-            }
-            Sync(erpDto.PaymentMethod, () => v.PaymentMethod, val => v.PaymentMethod = val);
-            Sync(erpDto.RoutingNumber, () => v.RoutingNumber ?? "", val => v.RoutingNumber = val);
-            Sync(erpDto.AccountNumber, () => v.AccountNumber ?? "", val => v.AccountNumber = val);
-            // AccountType is not reliably returned by SAP (no BankAccountTypeCode), so it is
-            // left to the local record rather than clobbered with the DTO default.
+            var before = Snapshot(v);
 
-            if (changed)
+            // Banking (AccountType isn't reliably returned by SAP, so it's left local).
+            if (!string.IsNullOrEmpty(e.PaymentMethod)) v.PaymentMethod = e.PaymentMethod;
+            if (!string.IsNullOrEmpty(e.RoutingNumber)) v.RoutingNumber = e.RoutingNumber;
+            if (!string.IsNullOrEmpty(e.AccountNumber)) v.AccountNumber = e.AccountNumber;
+
+            // Address (PO Box vs street are mutually exclusive in the ERP).
+            v.IsPoBox = e.IsPoBox;
+            v.PoBox = e.IsPoBox ? e.PoBox : null;
+            v.HouseNumber = e.IsPoBox ? null : e.HouseNumber;
+            v.RemitStreet = e.IsPoBox ? "" : (string.IsNullOrEmpty(e.RemitStreet) ? v.RemitStreet : e.RemitStreet);
+            if (!string.IsNullOrEmpty(e.RemitCity)) v.RemitCity = e.RemitCity;
+            if (!string.IsNullOrEmpty(e.RemitState)) v.RemitState = e.RemitState;
+            if (!string.IsNullOrEmpty(e.RemitZip)) v.RemitZip = e.RemitZip;
+            if (!string.IsNullOrEmpty(e.RemitCountry)) v.RemitCountry = e.RemitCountry;
+
+            if (Snapshot(v) != before)
             {
                 v.LastSyncedAt = DateTimeOffset.UtcNow;
                 await db.SaveChangesAsync(ct);
@@ -61,7 +67,11 @@ public class VendorController(VssDbContext db, CurrentUser current, IErpClient e
         catch (Exception ex)
         {
             // A live ERP hiccup shouldn't break the profile page — serve the local copy.
-            log.LogWarning(ex, "ERP banking refresh failed for vendor {Number}; serving local copy", v.Number);
+            log.LogWarning(ex, "ERP refresh failed for vendor {Number}; serving local copy", v.Number);
         }
     }
+
+    private static string Snapshot(Vendor v) => string.Join('|',
+        v.PaymentMethod, v.RoutingNumber, v.AccountNumber,
+        v.IsPoBox, v.PoBox, v.HouseNumber, v.RemitStreet, v.RemitCity, v.RemitState, v.RemitZip, v.RemitCountry);
 }

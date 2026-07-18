@@ -44,7 +44,8 @@ public class SapByDesignErpClient : IErpClient
     }
 
     private static readonly string[] AddressFields =
-        { "RemitCountry", "RemitStreet", "RemitCity", "RemitState", "RemitZip", "PrimaryEmail", "PrimaryPhone" };
+        { "RemitCountry", "RemitStreet", "HouseNumber", "RemitCity", "RemitState", "RemitZip",
+          "AddressType", "PoBox", "PrimaryEmail", "PrimaryPhone" };
     private static readonly string[] BankingFields = { "RoutingNumber", "AccountNumber" };
 
     public async Task UpdateVendorMasterAsync(string vendorNumber, VendorMasterPatch patch, CancellationToken ct = default)
@@ -67,11 +68,28 @@ public class SapByDesignErpClient : IErpClient
 
                 var current = ParseSupplier(q);
                 void Fill(string key, string? value) { if (!fields.ContainsKey(key) && !string.IsNullOrEmpty(value)) fields[key] = value; }
+
+                // Resolve PO Box vs street: an explicit AddressType change wins, else keep the
+                // supplier's current shape. Normalise to IsPoBox for the envelope builder.
+                var isPoBox = fields.TryGetValue("AddressType", out var at) && at is not null
+                    ? string.Equals(at, "PO Box", StringComparison.OrdinalIgnoreCase)
+                    : (current?.IsPoBox ?? false);
+                fields["IsPoBox"] = isPoBox ? "true" : "false";
+
                 Fill("RemitCountry", current?.RemitCountry);
-                Fill("RemitStreet", current?.RemitStreet);
                 Fill("RemitCity", current?.RemitCity);
                 Fill("RemitState", current?.RemitState);
-                Fill("RemitZip", current?.RemitZip);
+                if (isPoBox)
+                {
+                    Fill("PoBox", current?.PoBox);
+                    Fill("RemitZip", current?.RemitZip); // POBoxPostalCode (parsed into RemitZip)
+                }
+                else
+                {
+                    Fill("RemitStreet", current?.RemitStreet);
+                    Fill("HouseNumber", current?.HouseNumber);
+                    Fill("RemitZip", current?.RemitZip);
+                }
             }
 
             if (needsBanking)
@@ -231,6 +249,21 @@ public class SapByDesignErpClient : IErpClient
             PrimaryEmail = F("EmailURI") ?? F("URI"),
             Tin = F("TaxID") ?? F("PartyTaxID"),
         };
+
+        // PO Box vs street address. SAP flags a PO Box with POBoxIndicator=true and carries
+        // the box number/postal code in dedicated fields (no StreetName). Surface the right
+        // shape so the portal shows PO Box fields for a PO Box and street fields otherwise.
+        if (string.Equals(F("POBoxIndicator"), "true", StringComparison.OrdinalIgnoreCase))
+        {
+            dto.IsPoBox = true;
+            dto.PoBox = F("POBoxID");
+            dto.RemitStreet = "";
+            dto.RemitZip = F("POBoxPostalCode") ?? dto.RemitZip;
+        }
+        else
+        {
+            dto.HouseNumber = F("HouseID");
+        }
 
         // Payment method (PaymentData/PaymentForm/PaymentFormCode) drives whether the
         // portal shows bank fields, so surface it as the mapped display value.

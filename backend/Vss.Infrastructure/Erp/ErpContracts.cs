@@ -13,7 +13,10 @@ public class ErpVendorDto
     public string? Website { get; set; }
     public string Status { get; set; } = "Active";
 
+    public bool IsPoBox { get; set; }
+    public string? PoBox { get; set; }
     public string RemitStreet { get; set; } = string.Empty;
+    public string? HouseNumber { get; set; }
     public string RemitCity { get; set; } = string.Empty;
     public string RemitState { get; set; } = string.Empty;
     public string RemitZip { get; set; } = string.Empty;

@@ -53,11 +53,28 @@ internal static class Sap
         {
             if (fields.TryGetValue(field, out var v) && !string.IsNullOrEmpty(v)) postal.Add(new XElement(el, v));
         }
-        P("RemitCountry", "CountryCode"); // schema order: Country, Street, City, Region, PostalCode
-        P("RemitStreet", "StreetName");
+        // Schema order: CountryCode, [StreetName, HouseID | ...], CityName, RegionCode,
+        // StreetPostalCode, ..., POBoxIndicator, POBoxID, POBoxPostalCode. A PO Box carries
+        // the box number/postal code in the PO Box fields instead of the street fields.
+        var isPoBox = string.Equals(fields.GetValueOrDefault("IsPoBox"), "true", StringComparison.OrdinalIgnoreCase);
+        P("RemitCountry", "CountryCode");
+        if (!isPoBox)
+        {
+            P("RemitStreet", "StreetName");
+            P("HouseNumber", "HouseID");
+        }
         P("RemitCity", "CityName");
         P("RemitState", "RegionCode");
-        P("RemitZip", "StreetPostalCode");
+        if (isPoBox)
+        {
+            postal.Add(new XElement("POBoxIndicator", "true"));
+            P("PoBox", "POBoxID");
+            P("RemitZip", "POBoxPostalCode");
+        }
+        else
+        {
+            P("RemitZip", "StreetPostalCode");
+        }
         if (postal.HasElements) address.Add(postal);
         if (fields.TryGetValue("PrimaryPhone", out var phone) && !string.IsNullOrEmpty(phone))
             address.Add(new XElement("PhoneFormattedNumberDescription", phone));

@@ -23,7 +23,13 @@ public class Vendor
     public string Status { get; set; } = "Active";
 
     // ---- Remit-to / physical address ----
+    /// <summary>True when the remit-to address is a PO Box (drives which fields apply).</summary>
+    public bool IsPoBox { get; set; }
+    /// <summary>PO Box number (when <see cref="IsPoBox"/>).</summary>
+    public string? PoBox { get; set; }
     public string RemitStreet { get; set; } = string.Empty;
+    /// <summary>House / building number for a street address.</summary>
+    public string? HouseNumber { get; set; }
     public string RemitCity { get; set; } = string.Empty;
     public string RemitState { get; set; } = string.Empty;
     public string RemitZip { get; set; } = string.Empty;

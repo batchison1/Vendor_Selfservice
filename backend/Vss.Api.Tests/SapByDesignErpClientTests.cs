@@ -120,6 +120,48 @@ public class SapByDesignErpClientTests
         Assert.Equal("999888777", v.AccountNumber);
     }
 
+    [Fact]
+    public async Task GetVendor_parses_po_box_address()
+    {
+        var response = SupplierWithBank("") // reuse envelope wrapper; inject PO box postal address
+            .Replace("<InternalID>62440</InternalID>",
+                "<InternalID>62440</InternalID><Address><PostalAddress>" +
+                "<CountryCode>US</CountryCode><CityName>SEYMOUR</CityName><RegionCode>IN</RegionCode>" +
+                "<POBoxIndicator>true</POBoxIndicator><POBoxID>432</POBoxID><POBoxPostalCode>47274</POBoxPostalCode>" +
+                "</PostalAddress></Address>");
+        var (client, _) = Make((_, _) => FakeHttpHandler.Xml(response));
+
+        var v = await client.GetVendorAsync("62440");
+
+        Assert.NotNull(v);
+        Assert.True(v!.IsPoBox);
+        Assert.Equal("432", v.PoBox);
+        Assert.Equal("47274", v.RemitZip);
+        Assert.Equal("", v.RemitStreet);
+    }
+
+    [Fact]
+    public async Task Update_po_box_address_builds_pobox_postal_and_no_street()
+    {
+        // Query returns an AddressInformation UUID (needed for in-place address update).
+        var query = SupplierWithBank("").Replace("<InternalID>62440</InternalID>",
+            "<InternalID>62440</InternalID><AddressInformation><UUID>addr-uuid-1</UUID></AddressInformation>");
+        var (client, handler) = Make((_, body) =>
+            FakeHttpHandler.Xml(body.Contains("SupplierByElementsQuery_sync") ? query : MaintainOk));
+
+        await client.UpdateVendorMasterAsync("62440", new VendorMasterPatch
+        {
+            Fields = { ["AddressType"] = "PO Box", ["PoBox"] = "500", ["RemitCity"] = "SEYMOUR",
+                       ["RemitState"] = "IN", ["RemitZip"] = "47274", ["RemitCountry"] = "US" },
+        });
+
+        var body = handler.Calls.Last().Body;
+        Assert.Contains("<POBoxIndicator>true</POBoxIndicator>", body);
+        Assert.Contains("<POBoxID>500</POBoxID>", body);
+        Assert.Contains("<POBoxPostalCode>47274</POBoxPostalCode>", body);
+        Assert.DoesNotContain("StreetName", body);
+    }
+
     private const string MaintainOk = """
     <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>
       <n0:SupplierBundleMaintainConfirmation_sync xmlns:n0="http://sap.com/xi/SAPGlobal20/Global">

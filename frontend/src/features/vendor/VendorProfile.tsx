@@ -58,14 +58,23 @@ function fieldsFor(tab: string, v: Vendor): FieldDef[] {
       t("SalesContactName", "Sales contact name", v.contacts.salesContactName),
       t("SalesEmail", "Sales email", v.contacts.salesEmail),
     ];
-    case "addresses": return [
-      t("RemitStreet", "Remit-to street", v.address.remitStreet, true),
-      t("RemitCity", "City", v.address.remitCity),
-      sel("RemitState", "State", v.address.remitState, ["MT", "WA", "CA", "ID", "WY"]),
-      t("RemitZip", "ZIP", v.address.remitZip),
-      sel("RemitCountry", "Country", v.address.remitCountry, ["United States", "Canada"]),
-      t("PhysicalAddress", "Physical address", v.address.physicalAddress, true),
-    ];
+    case "addresses": {
+      // PO Box rule: a PO Box address shows the box number; a street address shows the
+      // street + house number. City / state / ZIP / country apply to both.
+      const isPo = (vals: Record<string, string>) => vals.AddressType === "PO Box";
+      const isStreet = (vals: Record<string, string>) => vals.AddressType === "Street";
+      return [
+        sel("AddressType", "Address type", v.address.isPoBox ? "PO Box" : "Street", ["Street", "PO Box"]),
+        { ...t("PoBox", "PO Box number", v.address.poBox), showWhen: isPo },
+        { ...t("RemitStreet", "Remit-to street", v.address.remitStreet, true), showWhen: isStreet },
+        { ...t("HouseNumber", "House / building no.", v.address.houseNumber), showWhen: isStreet },
+        t("RemitCity", "City", v.address.remitCity),
+        sel("RemitState", "State", v.address.remitState, ["MT", "WA", "CA", "ID", "WY", "IN", "NC"]),
+        t("RemitZip", "ZIP", v.address.remitZip),
+        sel("RemitCountry", "Country", v.address.remitCountry, ["United States", "Canada"]),
+        t("PhysicalAddress", "Physical address", v.address.physicalAddress, true),
+      ];
+    }
     case "banking": {
       // Bank detail fields only apply to electronic payment methods (not Check).
       const needsBank = (vals: Record<string, string>) => vals.PaymentMethod !== "Check";
