@@ -44,6 +44,7 @@ export function AppShell({ title, crumb, children }: { title: string; crumb: str
     { label: "Link requests", icon: "link", to: "/admin/link-requests", badge: stats?.pendingLinks },
     { label: "Change requests", icon: "changes", to: "/admin/change-requests", badge: stats?.pendingChanges },
     { label: "ERP integration", icon: "plug", to: "/admin/erp" },
+    { label: "Document types", icon: "changes", to: "/admin/document-types" },
   ];
   const items = isAdmin ? adminNav : VENDOR_NAV;
 

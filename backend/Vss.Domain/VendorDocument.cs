@@ -8,6 +8,9 @@ public class VendorDocument
 
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>Code of the <see cref="DocumentType"/> this document is filed under.</summary>
+    public string? DocumentTypeCode { get; set; }
+
     /// <summary>Original file name for display, e.g. "W-9.pdf". Null when nothing uploaded.</summary>
     public string? FileRef { get; set; }
 

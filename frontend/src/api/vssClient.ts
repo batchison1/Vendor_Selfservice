@@ -35,7 +35,8 @@ export interface Contacts {
   primaryContact?: string | null; primaryTitle?: string | null; primaryEmail?: string | null; primaryPhone?: string | null;
   apContactName?: string | null; apEmail?: string | null; salesContactName?: string | null; salesEmail?: string | null;
 }
-export interface VendorDoc { id: string; name: string; fileRef?: string | null; validity: string; status: string; }
+export interface VendorDoc { id: string; name: string; fileRef?: string | null; validity: string; status: string; typeCode?: string | null; }
+export interface DocumentType { id: string; code: string; description: string; isActive: boolean; sortOrder: number; }
 
 export interface Vendor {
   number: string; legalName: string; dba?: string | null; entityType: string; website?: string | null; status: string;
@@ -61,7 +62,7 @@ export interface LinkRequestCreate {
   vendorNumber?: string; pin?: string; taxId?: string; zip?: string;
 }
 export interface ChangeRequestCreate { section: string; diffs: ChangeDiff[]; }
-export interface DocumentUpload { name: string; fileName: string; contentType: string; contentBase64: string; }
+export interface DocumentUpload { typeCode: string; fileName: string; contentType: string; contentBase64: string; }
 
 // ------------------------------------------------------------------ Query keys
 export const qk = {
@@ -78,6 +79,8 @@ export const useVendor = (enabled: boolean) =>
 
 export const useMyChangeRequests = (enabled: boolean) =>
   useApiQuery<ChangeRequest[]>(VSS_BASE, "api/v1/change-requests?mine=true", undefined, { enabled });
+
+export const useDocumentTypes = () => useApiQuery<DocumentType[]>(VSS_BASE, "api/v1/documents/types");
 
 // ------------------------------------------------------------------ Mutations
 export const linkRequests = {

@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "../../layout/AppShell";
 import { Button, Card, Label, TextField, SelectField, ReadonlyField, StatusPill, Spinner, Banner } from "../../ui";
 import {
-  useMe, useVendor, changeRequests, documents, qk, type Vendor, type ChangeDiff,
+  useMe, useVendor, useDocumentTypes, changeRequests, documents, qk, type Vendor, type ChangeDiff,
 } from "../../api/vssClient";
 
 type Kind = "text" | "select" | "readonly";
@@ -227,13 +227,14 @@ function readAsBase64(file: File): Promise<string> {
 
 function DocumentsPanel({ vendor }: { vendor: Vendor }) {
   const qc = useQueryClient();
+  const { data: types } = useDocumentTypes();
   const [pending, setPending] = useState<string | null>(null);
-  const [newName, setNewName] = useState("");
+  const [typeCode, setTypeCode] = useState("");
   const upload = useMutation({
-    mutationFn: async ({ name, file }: { name: string; file: File }) =>
-      documents.upload({ name, fileName: file.name, contentType: file.type || "application/pdf", contentBase64: await readAsBase64(file) }),
+    mutationFn: async ({ code, file }: { code: string; file: File }) =>
+      documents.upload({ typeCode: code, fileName: file.name, contentType: file.type || "application/pdf", contentBase64: await readAsBase64(file) }),
     onSuccess: () => {
-      setNewName("");
+      setTypeCode("");
       return Promise.all([
         qc.invalidateQueries({ queryKey: qk.me }),
         qc.invalidateQueries({ queryKey: qk.vendor }),
@@ -242,46 +243,40 @@ function DocumentsPanel({ vendor }: { vendor: Vendor }) {
     onSettled: () => setPending(null),
   });
 
-  const pick = (name: string) => {
+  const pick = (code: string) => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "application/pdf";
     input.onchange = () => {
       const file = input.files?.[0];
-      if (file) { setPending(name); upload.mutate({ name, file }); }
+      if (file) { setPending(code); upload.mutate({ code, file }); }
     };
     input.click();
   };
 
-  const existingNames = new Set(vendor.documents.map((d) => d.name.toLowerCase()));
-  const trimmed = newName.trim();
-  const duplicate = existingNames.has(trimmed.toLowerCase());
+  const options = types ?? [];
+  const existingCodes = new Set(vendor.documents.map((d) => d.typeCode).filter(Boolean));
+  const duplicate = !!typeCode && existingCodes.has(typeCode);
 
   const cols = ["Document", "File", "Validity", "Status", ""];
   return (
     <div style={{ padding: "8px 0" }}>
-      {/* New document upload — adds a new document rather than replacing an existing slot. */}
+      {/* New document upload — pick a configured document type, then attach a PDF. */}
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--border-1)", background: "var(--bg-2)", display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 280px" }}>
           <Label>Add a new document</Label>
-          <input
-            list="vss-doc-types"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="e.g. Certificate of Insurance"
-            style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--border-1)", borderRadius: 6, fontSize: 13, color: "var(--fg-1)", outline: "none", fontFamily: "var(--font-sans)" }}
-          />
-          <datalist id="vss-doc-types">
-            <option value="W-9" />
-            <option value="Certificate of Insurance" />
-            <option value="Business License" />
-            <option value="Bank Verification Letter" />
-            <option value="Diversity Certification" />
-          </datalist>
-          {duplicate && <div style={{ fontSize: 12, color: "var(--fg-2)", marginTop: 4 }}>A document named “{trimmed}” already exists — uploading will replace it below.</div>}
+          <select
+            value={typeCode}
+            onChange={(e) => setTypeCode(e.target.value)}
+            style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--border-1)", borderRadius: 6, fontSize: 13, color: "var(--fg-1)", outline: "none", fontFamily: "var(--font-sans)", background: "#fff" }}
+          >
+            <option value="">Select a document type…</option>
+            {options.map((t) => <option key={t.code} value={t.code}>{t.description}</option>)}
+          </select>
+          {duplicate && <div style={{ fontSize: 12, color: "var(--fg-2)", marginTop: 4 }}>This document type already exists — uploading will replace it below.</div>}
         </div>
-        <Button variant="teal" style={{ padding: "9px 16px", fontSize: 13 }} disabled={!trimmed || upload.isPending} onClick={() => pick(trimmed)}>
-          {pending === trimmed && upload.isPending ? "Uploading…" : "+ Upload new document"}
+        <Button variant="teal" style={{ padding: "9px 16px", fontSize: 13 }} disabled={!typeCode || upload.isPending} onClick={() => pick(typeCode)}>
+          {pending === typeCode && upload.isPending ? "Uploading…" : "+ Upload new document"}
         </Button>
       </div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -296,8 +291,8 @@ function DocumentsPanel({ vendor }: { vendor: Vendor }) {
               <td style={{ padding: "14px 24px", fontSize: 14, color: "var(--fg-2)" }}>{d.validity}</td>
               <td style={{ padding: "14px 24px" }}><StatusPill status={d.status} /></td>
               <td style={{ padding: "14px 24px", textAlign: "right" }}>
-                <Button variant="outline" style={{ padding: "7px 14px", fontSize: 13 }} disabled={upload.isPending} onClick={() => pick(d.name)}>
-                  {pending === d.name && upload.isPending ? "Uploading…" : d.fileRef ? "Replace" : "Upload PDF"}
+                <Button variant="outline" style={{ padding: "7px 14px", fontSize: 13 }} disabled={upload.isPending || !d.typeCode} onClick={() => d.typeCode && pick(d.typeCode)}>
+                  {pending === d.typeCode && upload.isPending ? "Uploading…" : d.fileRef ? "Replace" : "Upload PDF"}
                 </Button>
               </td>
             </tr>

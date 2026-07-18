@@ -18,6 +18,7 @@ import { AdminChangeDetail } from "./features/admin/AdminChangeDetail";
 import { AdminVendors } from "./features/admin/AdminVendors";
 import { AdminLinkRequests } from "./features/admin/AdminLinkRequests";
 import { AdminErp } from "./features/admin/AdminErp";
+import { AdminDocumentTypes } from "./features/admin/AdminDocumentTypes";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -61,6 +62,7 @@ function Shell() {
       <Route path="/admin/change-requests" element={<RequireAuth><AdminChangeRequests /></RequireAuth>} />
       <Route path="/admin/change-requests/:id" element={<RequireAuth><AdminChangeDetail /></RequireAuth>} />
       <Route path="/admin/erp" element={<RequireAuth><AdminErp /></RequireAuth>} />
+      <Route path="/admin/document-types" element={<RequireAuth><AdminDocumentTypes /></RequireAuth>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -138,6 +138,68 @@ public class AdminController(VssDbContext db, IErpClient erp, IOptions<ErpOption
         await db.ChangeRequests.CountAsync(c => c.Status == ChangeRequestStatus.PendingReview || c.Status == ChangeRequestStatus.InReview, ct),
         await db.VendorUsers.CountAsync(u => u.LinkState == LinkState.Linked, ct));
 
+    // ---- Document types (configuration maintained by City staff) ----
+    [HttpGet("document-types")]
+    public async Task<ActionResult<IEnumerable<DocumentTypeDto>>> DocumentTypes(CancellationToken ct)
+    {
+        var rows = await db.DocumentTypes.OrderBy(t => t.SortOrder).ThenBy(t => t.Description).ToListAsync(ct);
+        return rows.Select(t => new DocumentTypeDto(t.Id, t.Code, t.Description, t.IsActive, t.SortOrder)).ToList();
+    }
+
+    [HttpPost("document-types")]
+    public async Task<ActionResult<DocumentTypeDto>> CreateDocumentType(DocumentTypeUpsertDto dto, CancellationToken ct)
+    {
+        var code = (dto.Code ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(dto.Description))
+            return BadRequest("Code and description are required.");
+        if (await db.DocumentTypes.AnyAsync(t => t.Code == code, ct))
+            return Conflict($"Document type '{code}' already exists.");
+
+        var t = new DocumentType { Code = code, Description = dto.Description.Trim(), IsActive = dto.IsActive, SortOrder = dto.SortOrder };
+        db.DocumentTypes.Add(t);
+        await db.SaveChangesAsync(ct);
+        return new DocumentTypeDto(t.Id, t.Code, t.Description, t.IsActive, t.SortOrder);
+    }
+
+    [HttpPut("document-types/{id:guid}")]
+    public async Task<ActionResult<DocumentTypeDto>> UpdateDocumentType(Guid id, DocumentTypeUpsertDto dto, CancellationToken ct)
+    {
+        var t = await db.DocumentTypes.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (t is null) return NotFound();
+
+        var code = (dto.Code ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(dto.Description))
+            return BadRequest("Code and description are required.");
+        if (await db.DocumentTypes.AnyAsync(x => x.Code == code && x.Id != id, ct))
+            return Conflict($"Document type '{code}' already exists.");
+
+        t.Code = code;
+        t.Description = dto.Description.Trim();
+        t.IsActive = dto.IsActive;
+        t.SortOrder = dto.SortOrder;
+        await db.SaveChangesAsync(ct);
+        return new DocumentTypeDto(t.Id, t.Code, t.Description, t.IsActive, t.SortOrder);
+    }
+
+    [HttpDelete("document-types/{id:guid}")]
+    public async Task<IActionResult> DeleteDocumentType(Guid id, CancellationToken ct)
+    {
+        var t = await db.DocumentTypes.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (t is null) return NotFound();
+
+        // Preserve history: if any uploaded document uses this code, deactivate instead of delete.
+        if (await db.Documents.AnyAsync(d => d.DocumentTypeCode == t.Code, ct))
+        {
+            t.IsActive = false;
+            await db.SaveChangesAsync(ct);
+            return Ok(new { deactivated = true, message = "Type is in use; deactivated instead of deleted." });
+        }
+
+        db.DocumentTypes.Remove(t);
+        await db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
     [HttpGet("link-requests")]
     public async Task<ActionResult<IEnumerable<AdminLinkRequestDto>>> LinkRequests(CancellationToken ct)
     {

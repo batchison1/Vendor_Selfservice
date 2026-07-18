@@ -17,7 +17,7 @@ public record AddressDto(bool IsPoBox, string? PoBox, string RemitStreet, string
 public record BankingDto(string PaymentMethod, string? BankName, string? RoutingNumberMasked, string? AccountNumberMasked, string AccountType);
 public record TaxDto(string? LegalTaxName, string TaxIdType, string? TinMasked, string? TaxClassification, string ExemptPayee, string? W9OnFile);
 public record ContactsDto(string? PrimaryContact, string? PrimaryTitle, string? PrimaryEmail, string? PrimaryPhone, string? ApContactName, string? ApEmail, string? SalesContactName, string? SalesEmail);
-public record DocumentDto(Guid Id, string Name, string? FileRef, string Validity, string Status);
+public record DocumentDto(Guid Id, string Name, string? FileRef, string Validity, string Status, string? TypeCode);
 
 public record VendorDto(
     string Number,
@@ -44,9 +44,14 @@ public record ChangeRequestDto(Guid Id, string Code, string VendorName, string S
 public record ReviewDecisionDto(string? Note);
 
 // ---- Documents ----
-/// <summary>A document uploaded from the portal: the compliance slot <paramref name="Name"/>,
-/// the original file name, its MIME type, and the file bytes as base64.</summary>
-public record DocumentUploadDto(string Name, string FileName, string ContentType, string ContentBase64);
+/// <summary>A document uploaded from the portal: the selected document type
+/// (<paramref name="TypeCode"/>), the original file name, its MIME type, and the file
+/// bytes as base64.</summary>
+public record DocumentUploadDto(string TypeCode, string FileName, string ContentType, string ContentBase64);
+
+// ---- Document types (configurable) ----
+public record DocumentTypeDto(Guid Id, string Code, string Description, bool IsActive, int SortOrder);
+public record DocumentTypeUpsertDto(string Code, string Description, bool IsActive, int SortOrder);
 
 // ---- Admin ----
 public record AdminLinkRequestDto(Guid Id, string Company, string Email, string Method, string? MatchedVendorNumber, DateTimeOffset CreatedAt, string Status);

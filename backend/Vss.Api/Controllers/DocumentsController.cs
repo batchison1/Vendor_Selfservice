@@ -21,7 +21,7 @@ public class DocumentsController(VssDbContext db, CurrentUser current, IDocument
         if (user.VendorId is null) return Array.Empty<DocumentDto>();
 
         var docs = await db.Documents.Where(d => d.VendorId == user.VendorId).ToListAsync(ct);
-        return docs.Select(d => new DocumentDto(d.Id, d.Name, d.FileRef, d.Validity, d.Status.ToString())).ToList();
+        return docs.Select(d => new DocumentDto(d.Id, d.Name, d.FileRef, d.Validity, d.Status.ToString(), d.DocumentTypeCode)).ToList();
     }
 
     /// <summary>Upload a document's bytes: store them via <see cref="IDocumentStore"/> and
@@ -34,6 +34,10 @@ public class DocumentsController(VssDbContext db, CurrentUser current, IDocument
         if (user.LinkState != LinkState.Linked || user.VendorId is null)
             return StatusCode(StatusCodes.Status403Forbidden, "Link your account first.");
 
+        // Resolve the selected document type from the configuration table.
+        var type = await db.DocumentTypes.FirstOrDefaultAsync(t => t.Code == dto.TypeCode && t.IsActive, ct);
+        if (type is null) return BadRequest($"Unknown or inactive document type '{dto.TypeCode}'.");
+
         byte[] bytes;
         try { bytes = Convert.FromBase64String(dto.ContentBase64); }
         catch (FormatException) { return BadRequest("ContentBase64 is not valid base64."); }
@@ -42,12 +46,14 @@ public class DocumentsController(VssDbContext db, CurrentUser current, IDocument
         var contentType = string.IsNullOrWhiteSpace(dto.ContentType) ? "application/octet-stream" : dto.ContentType;
         var storageRef = await store.SaveAsync(dto.FileName, contentType, bytes, ct);
 
-        var doc = await db.Documents.FirstOrDefaultAsync(d => d.VendorId == user.VendorId && d.Name == dto.Name, ct);
+        // One document per type per vendor: replace the existing one, else create it.
+        var doc = await db.Documents.FirstOrDefaultAsync(d => d.VendorId == user.VendorId && d.DocumentTypeCode == type.Code, ct);
         if (doc is null)
         {
-            doc = new VendorDocument { VendorId = user.VendorId!.Value, Name = dto.Name };
+            doc = new VendorDocument { VendorId = user.VendorId!.Value, DocumentTypeCode = type.Code };
             db.Documents.Add(doc);
         }
+        doc.Name = type.Description;
         doc.FileRef = dto.FileName;
         doc.StorageRef = storageRef;
         doc.ContentType = contentType;
@@ -67,11 +73,20 @@ public class DocumentsController(VssDbContext db, CurrentUser current, IDocument
             DocumentId = doc.Id,
             SubmittedByUserId = user.Id,
             SubmittedByName = user.DisplayName,
-            Diffs = { new ChangeDiff { Field = dto.Name, FromValue = null, ToValue = dto.FileName } },
+            Diffs = { new ChangeDiff { Field = type.Description, FromValue = null, ToValue = dto.FileName } },
         });
         await db.SaveChangesAsync(ct);
 
-        return new DocumentDto(doc.Id, doc.Name, doc.FileRef, doc.Validity, doc.Status.ToString());
+        return new DocumentDto(doc.Id, doc.Name, doc.FileRef, doc.Validity, doc.Status.ToString(), doc.DocumentTypeCode);
+    }
+
+    /// <summary>Active document types for the upload dropdown (from the config table).</summary>
+    [HttpGet("types")]
+    public async Task<ActionResult<IEnumerable<DocumentTypeDto>>> Types(CancellationToken ct)
+    {
+        var types = await db.DocumentTypes.Where(t => t.IsActive)
+            .OrderBy(t => t.SortOrder).ThenBy(t => t.Description).ToListAsync(ct);
+        return types.Select(t => new DocumentTypeDto(t.Id, t.Code, t.Description, t.IsActive, t.SortOrder)).ToList();
     }
 
     /// <summary>Streams a stored document's bytes for preview/download. The owning vendor or

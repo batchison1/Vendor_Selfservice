@@ -1,5 +1,7 @@
 import { useApiQuery, apiMutate } from "@univerus/udp-react-enterprise-component-library";
-import { VSS_BASE, type ChangeRequest } from "./vssClient";
+import { VSS_BASE, type ChangeRequest, type DocumentType } from "./vssClient";
+
+export interface DocumentTypeUpsert { code: string; description: string; isActive: boolean; sortOrder: number; }
 
 // ------------------------------------------------------------------ Admin types
 export interface AdminStats {
@@ -32,6 +34,7 @@ export const adminQk = {
   linkRequests: [VSS_BASE, "api/v1/admin/link-requests"],
   vendors: [VSS_BASE, "api/v1/admin/vendors"],
   change: (id: string) => [VSS_BASE, `api/v1/admin/change-requests/${id}`],
+  documentTypes: [VSS_BASE, "api/v1/admin/document-types"],
 };
 
 // ------------------------------------------------------------------ Read hooks
@@ -40,6 +43,7 @@ export const useAdminChangeRequests = () => useApiQuery<ChangeRequest[]>(VSS_BAS
 export const useAdminChangeRequest = (id: string) => useApiQuery<ChangeRequest>(VSS_BASE, `api/v1/admin/change-requests/${id}`);
 export const useAdminVendors = () => useApiQuery<AdminVendor[]>(VSS_BASE, "api/v1/admin/vendors");
 export const useAdminLinkRequests = () => useApiQuery<AdminLinkRequest[]>(VSS_BASE, "api/v1/admin/link-requests");
+export const useAdminDocumentTypes = () => useApiQuery<DocumentType[]>(VSS_BASE, "api/v1/admin/document-types");
 
 export interface ErpTestResult { provider: string; ok: boolean; latencyMs: number; message: string; }
 
@@ -54,4 +58,10 @@ export const adminApi = {
     apiMutate<void>(VSS_BASE, `api/v1/admin/link-requests/${id}/approve`, { method: "POST" }),
   rejectLink: (id: string) =>
     apiMutate<void>(VSS_BASE, `api/v1/admin/link-requests/${id}/reject`, { method: "POST" }),
+  createDocType: (body: DocumentTypeUpsert) =>
+    apiMutate<DocumentType>(VSS_BASE, "api/v1/admin/document-types", { method: "POST", body }),
+  updateDocType: (id: string, body: DocumentTypeUpsert) =>
+    apiMutate<DocumentType>(VSS_BASE, `api/v1/admin/document-types/${id}`, { method: "PUT", body }),
+  deleteDocType: (id: string) =>
+    apiMutate<void>(VSS_BASE, `api/v1/admin/document-types/${id}`, { method: "DELETE" }),
 };

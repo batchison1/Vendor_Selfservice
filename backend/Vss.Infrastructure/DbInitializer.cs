@@ -21,6 +21,9 @@ public static class DbInitializer
         if (!await db.VendorUsers.AnyAsync(ct))
             db.VendorUsers.Add(SeedData.DanaUser());
 
+        if (!await db.DocumentTypes.AnyAsync(ct))
+            db.DocumentTypes.AddRange(SeedData.DocumentTypes());
+
         await db.SaveChangesAsync(ct);
     }
 
@@ -38,6 +41,8 @@ public static class DbInitializer
 
         db.Vendors.AddRange(SeedData.Vendors());
         db.VendorUsers.Add(SeedData.DanaUser());
+        if (!await db.DocumentTypes.AnyAsync(ct))
+            db.DocumentTypes.AddRange(SeedData.DocumentTypes());
         await db.SaveChangesAsync(ct);
     }
 }

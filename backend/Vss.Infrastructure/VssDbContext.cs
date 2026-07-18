@@ -14,6 +14,7 @@ public class VssDbContext(DbContextOptions<VssDbContext> options) : DbContext(op
     public DbSet<ChangeRequest> ChangeRequests => Set<ChangeRequest>();
     public DbSet<ChangeDiff> ChangeDiffs => Set<ChangeDiff>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
+    public DbSet<DocumentType> DocumentTypes => Set<DocumentType>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -46,5 +47,7 @@ public class VssDbContext(DbContextOptions<VssDbContext> options) : DbContext(op
             e.HasOne(c => c.Vendor).WithMany().HasForeignKey(c => c.VendorId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(c => c.Diffs).WithOne().HasForeignKey(d => d.ChangeRequestId).OnDelete(DeleteBehavior.Cascade);
         });
+
+        b.Entity<DocumentType>(e => e.HasIndex(t => t.Code).IsUnique());
     }
 }

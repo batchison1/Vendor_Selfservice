@@ -28,6 +28,7 @@ export function AdminConsole() {
     { title: "Link requests", desc: "Approve vendors linking to records", icon: ICON.link, to: "/admin/link-requests", bg: "#FDECDD", fg: "var(--color-orange)", badge: s.pendingLinks },
     { title: "Change requests", desc: "Review edits before ERP sync", icon: ICON.changes, to: "/admin/change-requests", bg: "#FFF4CC", fg: "#8A6D00", badge: s.pendingChanges },
     { title: "Vendors", desc: "All linked supplier records", icon: ICON.contacts, to: "/admin/vendors", bg: "#EEF3FA", fg: "var(--color-navy)" },
+    { title: "Document types", desc: "Configure upload document types", icon: ICON.changes, to: "/admin/document-types", bg: "#FFF4CC", fg: "#8A6D00" },
     { title: "Reports", desc: "Activity, sync health, exports", icon: ICON.report, to: "/admin", bg: "var(--bg-accent-soft)", fg: "var(--color-teal-700)" },
     { title: "Settings", desc: "Roles, notifications, branding", icon: ICON.settings, to: "/admin", bg: "#EEF3FA", fg: "var(--color-navy)" },
   ];

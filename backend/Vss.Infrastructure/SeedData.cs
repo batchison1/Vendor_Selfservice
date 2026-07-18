@@ -81,10 +81,10 @@ public static class SeedData
             },
             Documents = new()
             {
-                new() { Name = "W-9 form", FileRef = "W9_Northstar_2026.pdf", Validity = "No expiry", Status = DocumentStatus.Current },
-                new() { Name = "Certificate of insurance", FileRef = "COI_2026.pdf", Validity = "Exp. 12/31/2026", Status = DocumentStatus.Current },
-                new() { Name = "Business license", FileRef = "MT_license.pdf", Validity = "Exp. 08/15/2026", Status = DocumentStatus.Expiring },
-                new() { Name = "W-8BEN (if foreign)", FileRef = null, Validity = "—", Status = DocumentStatus.AwaitingDocs },
+                new() { Name = "W-9 Tax Form", DocumentTypeCode = "W9", FileRef = "W9_Northstar_2026.pdf", Validity = "No expiry", Status = DocumentStatus.Current },
+                new() { Name = "Certificate of Insurance", DocumentTypeCode = "COI", FileRef = "COI_2026.pdf", Validity = "Exp. 12/31/2026", Status = DocumentStatus.Current },
+                new() { Name = "Business License", DocumentTypeCode = "LICENSE", FileRef = "MT_license.pdf", Validity = "Exp. 08/15/2026", Status = DocumentStatus.Expiring },
+                new() { Name = "W-8BEN (foreign vendors)", DocumentTypeCode = "W8BEN", FileRef = null, Validity = "—", Status = DocumentStatus.AwaitingDocs },
             }
         },
         Simple("V-11204", "6501", "Gallatin Paper Co.", "Office & janitorial", "Bozeman", "MT", "59718", "45-2210987"),
@@ -92,6 +92,17 @@ public static class SeedData
         Simple("V-10771", "9048", "Bridger Mechanical", "HVAC services", "Bozeman", "MT", "59715", "27-5540912"),
         Simple("V-08841", "1120", "Sourdough Fuels", "Fuel & lubricants", "Bozeman", "MT", "59715", "46-8890123"),
         Simple("V-12010", "7789", "Big Sky Signage", "Signage", "Livingston", "MT", "59047", "84-2093455"),
+    };
+
+    /// <summary>Initial configurable document types offered for upload.</summary>
+    public static List<DocumentType> DocumentTypes() => new()
+    {
+        new() { Code = "W9", Description = "W-9 Tax Form", SortOrder = 1 },
+        new() { Code = "COI", Description = "Certificate of Insurance", SortOrder = 2 },
+        new() { Code = "LICENSE", Description = "Business License", SortOrder = 3 },
+        new() { Code = "BANKLTR", Description = "Bank Verification Letter", SortOrder = 4 },
+        new() { Code = "DIVCERT", Description = "Diversity Certification", SortOrder = 5 },
+        new() { Code = "W8BEN", Description = "W-8BEN (foreign vendors)", SortOrder = 6 },
     };
 
     private static Vendor Simple(string number, string pin, string name, string category,
