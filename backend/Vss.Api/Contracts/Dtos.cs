@@ -45,3 +45,8 @@ public record ReviewDecisionDto(string? Note);
 
 // ---- Documents ----
 public record DocumentUploadDto(string Name, string FileRef);
+
+// ---- Admin ----
+public record AdminLinkRequestDto(Guid Id, string Company, string Email, string Method, string? MatchedVendorNumber, DateTimeOffset CreatedAt, string Status);
+public record AdminVendorDto(string Number, string Name, string Category, DateTimeOffset? LastSync, string Status);
+public record AdminStatsDto(string ErpStatus, int PendingLinks, int PendingChanges, int LinkedVendors);

@@ -1,0 +1,35 @@
+# TEMPLATE / scaffolding — not production-ready.
+# Routes the host to the frontend, and /api to the backend.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vss
+  annotations:
+    # TODO: add the real UCP ingress annotations (TLS/cert-manager, rewrite rules,
+    #       auth, etc.) required by your cluster.
+    {}
+spec:
+  # TODO: set the real UCP ingress class (e.g. "nginx" or the UCP-provided class).
+  ingressClassName: PLACEHOLDER-INGRESS-CLASS
+  rules:
+    # TODO: set the real public host.
+    - host: PLACEHOLDER-HOST
+      http:
+        paths:
+          # Backend API — matched first so /api is not swallowed by the SPA route.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: vss-backend
+                port:
+                  number: 80
+          # Frontend SPA — catch-all.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vss-frontend
+                port:
+                  number: 80
+  # TODO: add a `tls:` block once the host + certificate are known.

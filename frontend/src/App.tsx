@@ -12,6 +12,12 @@ import { LinkSuccess } from "./features/auth/LinkSuccess";
 import { VendorConsole } from "./features/vendor/VendorConsole";
 import { VendorProfile } from "./features/vendor/VendorProfile";
 import { ChangeSubmitted } from "./features/vendor/ChangeSubmitted";
+import { AdminConsole } from "./features/admin/AdminConsole";
+import { AdminChangeRequests } from "./features/admin/AdminChangeRequests";
+import { AdminChangeDetail } from "./features/admin/AdminChangeDetail";
+import { AdminVendors } from "./features/admin/AdminVendors";
+import { AdminLinkRequests } from "./features/admin/AdminLinkRequests";
+import { AdminErp } from "./features/admin/AdminErp";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -19,9 +25,10 @@ const queryClient = new QueryClient({
 
 /** Sends the user to the right place based on auth + link state. */
 function RootRedirect() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, role } = useAuth();
   const { data: me, isLoading } = useMe();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (role === "admin") return <Navigate to="/admin" replace />;
   if (isLoading) return <Spinner label="Loading your portal…" />;
   return <Navigate to={me?.linkState === "Linked" ? "/console" : "/link"} replace />;
 }
@@ -46,6 +53,15 @@ function Shell() {
       <Route path="/profile" element={<Navigate to="/profile/company" replace />} />
       <Route path="/profile/:tab" element={<RequireAuth><VendorProfile /></RequireAuth>} />
       <Route path="/submitted" element={<RequireAuth><ChangeSubmitted /></RequireAuth>} />
+
+      {/* Admin (City staff) */}
+      <Route path="/admin" element={<RequireAuth><AdminConsole /></RequireAuth>} />
+      <Route path="/admin/vendors" element={<RequireAuth><AdminVendors /></RequireAuth>} />
+      <Route path="/admin/link-requests" element={<RequireAuth><AdminLinkRequests /></RequireAuth>} />
+      <Route path="/admin/change-requests" element={<RequireAuth><AdminChangeRequests /></RequireAuth>} />
+      <Route path="/admin/change-requests/:id" element={<RequireAuth><AdminChangeDetail /></RequireAuth>} />
+      <Route path="/admin/erp" element={<RequireAuth><AdminErp /></RequireAuth>} />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

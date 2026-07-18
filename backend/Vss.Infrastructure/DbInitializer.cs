@@ -23,4 +23,21 @@ public static class DbInitializer
 
         await db.SaveChangesAsync(ct);
     }
+
+    /// <summary>Dev-only: wipe all data and restore canonical seed data.</summary>
+    public static async Task ReseedAsync(VssDbContext db, CancellationToken ct = default)
+    {
+        // Delete children before parents (FK-safe).
+        await db.ChangeDiffs.ExecuteDeleteAsync(ct);
+        await db.ChangeRequests.ExecuteDeleteAsync(ct);
+        await db.LinkRequests.ExecuteDeleteAsync(ct);
+        await db.Documents.ExecuteDeleteAsync(ct);
+        await db.CategoryCodes.ExecuteDeleteAsync(ct);
+        await db.VendorUsers.ExecuteDeleteAsync(ct);
+        await db.Vendors.ExecuteDeleteAsync(ct);
+
+        db.Vendors.AddRange(SeedData.Vendors());
+        db.VendorUsers.Add(SeedData.DanaUser());
+        await db.SaveChangesAsync(ct);
+    }
 }

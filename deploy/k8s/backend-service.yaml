@@ -1,0 +1,15 @@
+# TEMPLATE / scaffolding — not production-ready.
+apiVersion: v1
+kind: Service
+metadata:
+  name: vss-backend
+  labels:
+    app: vss-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: vss-backend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

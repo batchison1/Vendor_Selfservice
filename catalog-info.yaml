@@ -1,0 +1,19 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: vendor-selfservice
+  title: Vendor Self Service Portal (VSS)
+  description: >-
+    Vendor self-service portal — vendors self-manage their record; every edit
+    becomes a change request that City staff approve, which then syncs to the
+    ERP vendor master. ASP.NET Core 10 API + React 18 (Vite) frontend.
+  annotations:
+    github.com/project-slug: batchison1/Vendor_Selfservice
+    # TODO: if TechDocs is enabled later, add: backstage.io/techdocs-ref: dir:.
+spec:
+  type: service
+  lifecycle: experimental
+  # TODO: set real owning team/group (Backstage group ref, e.g. group:default/vss-team)
+  owner: group:default/PLACEHOLDER-TEAM
+  # TODO: set the real system this component belongs to, then uncomment
+  # system: PLACEHOLDER

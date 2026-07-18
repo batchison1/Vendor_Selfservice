@@ -1,0 +1,37 @@
+# TEMPLATE / scaffolding — not production-ready. Fill in the placeholders below.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vss-frontend
+  labels:
+    app: vss-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vss-frontend
+  template:
+    metadata:
+      labels:
+        app: vss-frontend
+    spec:
+      containers:
+        - name: vss-frontend
+          # TODO: set the real registry + immutable image tag.
+          #       Note: REACT_APP_* values are baked in at image BUILD time
+          #       (see deploy/frontend.Dockerfile), not injected here.
+          image: REGISTRY/vss-frontend:TAG
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 20

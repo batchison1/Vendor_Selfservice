@@ -1,0 +1,56 @@
+# TEMPLATE / scaffolding — not production-ready. Fill in the placeholders below.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vss-backend
+  labels:
+    app: vss-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vss-backend
+  template:
+    metadata:
+      labels:
+        app: vss-backend
+    spec:
+      containers:
+        - name: vss-backend
+          # TODO: set the real registry + immutable image tag.
+          image: REGISTRY/vss-backend:TAG
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              value: "http://+:8080"
+            - name: Auth__Mode
+              value: "Entra"
+            # TODO: set the real frontend origin (used for CORS).
+            - name: Frontend__Origin
+              value: "https://PLACEHOLDER-HOST"
+            - name: ConnectionStrings__Vss
+              valueFrom:
+                secretKeyRef:
+                  # TODO: create Secret `vss-secrets` with key `db-connection`
+                  #       (the SQL Server connection string).
+                  name: vss-secrets
+                  key: db-connection
+            # TODO: for Auth__Mode=Entra, supply Microsoft.Identity.Web config,
+            #       e.g. AzureAd__TenantId / AzureAd__ClientId / AzureAd__Audience,
+            #       ideally sourced from `vss-secrets`.
+          readinessProbe:
+            httpGet:
+              # TODO: swagger is dev-only; add a real /health endpoint to the API
+              #       and point these probes at it. Using "/" as a placeholder.
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              # TODO: point at a real /health endpoint once it exists.
+              path: /
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 20

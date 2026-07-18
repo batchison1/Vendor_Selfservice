@@ -4,9 +4,10 @@ A real rebuild of the VSS design prototype (tenant: **City of Bozeman**) in Univ
 Unity/UDP conventions. Vendors self-manage their record; every edit becomes a
 **change request** that City staff approve, which then syncs to the ERP vendor master.
 
-This phase delivers the **vendor portal** end-to-end, a **real ASP.NET Core backend**,
-and the **ERP integration stubbed behind an interface**. The admin portal UI is the
-next phase (its approval endpoints already exist and are exercised by tests).
+Delivers the **vendor portal** and the **City-staff admin portal** end-to-end, a
+**real ASP.NET Core backend**, and the **ERP integration stubbed behind an interface**.
+In dev, switch between the two portals with the sidebar's "Demo: view as City staff"
+toggle.
 
 ```
 backend/    ASP.NET Core 10 Web API + EF Core (SQL Server) + ERP stub + xUnit tests
@@ -107,5 +108,16 @@ on approval. To go live, implement `UnityErpClient` against
 
 ## Not in this phase
 
-Full admin portal UI (link/change queues, diff review, ERP config screen, vendors grid),
-the real `UnityErpClient`, document binary storage, and CI/UCP deployment manifests.
+The real `UnityErpClient` (replace the stub), document binary storage, and hardening
+of the ERP-config screen (currently presentational). Dev-only `POST /api/v1/dev/reset`
+wipes and reseeds the database (404s unless `Auth:Mode=Dev`).
+
+## CI / Deployment
+
+- **CI** — [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on push and PRs to
+  `main`: a **backend** job (`dotnet test`, SQLite in-memory — no SQL Server) and a
+  **frontend** job (`npm ci` → `npm run typecheck` → `npm run build`).
+- **Deployment** — [`deploy/`](deploy/) holds Dockerfiles and Kubernetes manifests for
+  UCP. These are **templates with placeholders** (registry/image tags, `vss-secrets`,
+  host, Entra config, ingress class) — see [`deploy/README.md`](deploy/README.md) for what
+  to fill in. Not production-ready; a real `/health` endpoint should be added to the API.

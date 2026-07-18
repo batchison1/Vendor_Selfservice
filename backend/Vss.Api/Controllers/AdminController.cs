@@ -69,17 +69,86 @@ public class AdminController(VssDbContext db, IErpClient erp) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>A single change request (for the diff-review screen).</summary>
+    [HttpGet("change-requests/{id:guid}")]
+    public async Task<ActionResult<ChangeRequestDto>> ChangeRequest(Guid id, CancellationToken ct)
+    {
+        var c = await db.ChangeRequests.Include(x => x.Diffs).Include(x => x.Vendor)
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (c is null) return NotFound();
+        return new ChangeRequestDto(c.Id, c.Code, c.Vendor?.LegalName ?? "", c.Section, c.SubmittedByName,
+            c.SubmittedAt, c.Status.ToString(),
+            c.Diffs.Select(d => new ChangeDiffDto(d.Field, d.FromValue, d.ToValue)).ToArray());
+    }
+
+    [HttpGet("stats")]
+    public async Task<ActionResult<AdminStatsDto>> Stats(CancellationToken ct) => new AdminStatsDto(
+        "Online",
+        await db.LinkRequests.CountAsync(l => l.Status == LinkRequestStatus.Pending || l.Status == LinkRequestStatus.Matched, ct),
+        await db.ChangeRequests.CountAsync(c => c.Status == ChangeRequestStatus.PendingReview || c.Status == ChangeRequestStatus.InReview, ct),
+        await db.VendorUsers.CountAsync(u => u.LinkState == LinkState.Linked, ct));
+
+    [HttpGet("link-requests")]
+    public async Task<ActionResult<IEnumerable<AdminLinkRequestDto>>> LinkRequests(CancellationToken ct)
+    {
+        var rows = await db.LinkRequests.Include(l => l.VendorUser)
+            .OrderByDescending(l => l.CreatedAt).ToListAsync(ct);
+
+        var numbers = rows.Where(r => r.MatchedVendorNumber != null).Select(r => r.MatchedVendorNumber!).Distinct().ToList();
+        var names = await db.Vendors.Where(v => numbers.Contains(v.Number))
+            .ToDictionaryAsync(v => v.Number, v => v.LegalName, ct);
+
+        return rows.Select(r => new AdminLinkRequestDto(
+            r.Id,
+            (r.MatchedVendorNumber != null ? names.GetValueOrDefault(r.MatchedVendorNumber) : null) ?? r.VendorUser?.DisplayName ?? "",
+            r.VendorUser?.Email ?? "",
+            r.Method.ToString(),
+            r.MatchedVendorNumber,
+            r.CreatedAt,
+            r.Status.ToString())).ToList();
+    }
+
+    /// <summary>Approve a link request: finalize the account ↔ vendor link.</summary>
+    [HttpPost("link-requests/{id:guid}/approve")]
+    public async Task<IActionResult> ApproveLink(Guid id, CancellationToken ct)
+    {
+        var lr = await db.LinkRequests.Include(l => l.VendorUser).FirstOrDefaultAsync(l => l.Id == id, ct);
+        if (lr is null) return NotFound();
+        if (lr.MatchedVendorNumber is null || lr.VendorUser is null) return BadRequest("Nothing to link.");
+
+        var vendor = await db.Vendors.FirstOrDefaultAsync(v => v.Number == lr.MatchedVendorNumber, ct);
+        if (vendor is null) return BadRequest("Matched vendor not found.");
+
+        lr.VendorUser.VendorId = vendor.Id;
+        lr.VendorUser.LinkState = LinkState.Linked;
+        lr.Status = LinkRequestStatus.Approved;
+        lr.DecidedAt = DateTimeOffset.UtcNow;
+        lr.DecidedBy = "admin";
+        await db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    [HttpPost("link-requests/{id:guid}/reject")]
+    public async Task<IActionResult> RejectLink(Guid id, CancellationToken ct)
+    {
+        var lr = await db.LinkRequests.FirstOrDefaultAsync(l => l.Id == id, ct);
+        if (lr is null) return NotFound();
+        lr.Status = LinkRequestStatus.Rejected;
+        lr.DecidedAt = DateTimeOffset.UtcNow;
+        lr.DecidedBy = "admin";
+        await db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
     [HttpGet("vendors")]
-    public async Task<ActionResult<IEnumerable<object>>> Vendors(CancellationToken ct)
+    public async Task<ActionResult<IEnumerable<AdminVendorDto>>> Vendors(CancellationToken ct)
     {
         var rows = await db.Vendors.Include(v => v.CategoryCodes).OrderBy(v => v.Number).ToListAsync(ct);
-        return rows.Select(v => (object)new
-        {
+        return rows.Select(v => new AdminVendorDto(
             v.Number,
             v.LegalName,
-            Category = v.CategoryCodes.FirstOrDefault()?.Code ?? "",
-            LastSync = v.LastSyncedAt,
-            v.Status,
-        }).ToList();
+            v.CategoryCodes.FirstOrDefault()?.Code ?? "",
+            v.LastSyncedAt,
+            v.Status)).ToList();
     }
 }
