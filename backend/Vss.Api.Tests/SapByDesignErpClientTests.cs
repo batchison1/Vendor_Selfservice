@@ -84,6 +84,42 @@ public class SapByDesignErpClientTests
         Assert.Contains("<FirstLineName>Rocky Supply Co.</FirstLineName>", body);
     }
 
+    [Fact]
+    public async Task GetVendor_maps_payment_method_and_active_bank_from_validity()
+    {
+        // Supplier pays by cheque (06) and has a superseded account (end-dated) plus the
+        // current active account (validity covers "today", 2026-07-18 per the test clock).
+        var response = """
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>
+          <n0:SupplierByElementsResponse_sync xmlns:n0="http://sap.com/xi/SAPGlobal20/Global">
+            <Supplier>
+              <InternalID>62440</InternalID>
+              <PaymentData><PaymentForm><PaymentFormCode>06</PaymentFormCode></PaymentForm></PaymentData>
+              <BankDetails>
+                <ID>0001</ID><BankRoutingID>021303618</BankRoutingID>
+                <BankAccountID>111122223333</BankAccountID>
+                <ValidityPeriod><StartDate>2000-01-01</StartDate><EndDate>2020-12-31</EndDate></ValidityPeriod>
+              </BankDetails>
+              <BankDetails>
+                <ID>0002</ID><BankRoutingID>026009593</BankRoutingID>
+                <BankAccountID>999888777</BankAccountID>
+                <ValidityPeriod><StartDate>2021-01-01</StartDate><EndDate>9999-12-31</EndDate></ValidityPeriod>
+              </BankDetails>
+            </Supplier>
+          </n0:SupplierByElementsResponse_sync>
+        </soap:Body></soap:Envelope>
+        """;
+        var (client, _) = Make((_, _) => FakeHttpHandler.Xml(response));
+
+        var v = await client.GetVendorAsync("62440");
+
+        Assert.NotNull(v);
+        Assert.Equal("Check", v!.PaymentMethod);
+        // The active (unlimited) record, not the end-dated one.
+        Assert.Equal("026009593", v.RoutingNumber);
+        Assert.Equal("999888777", v.AccountNumber);
+    }
+
     private const string MaintainOk = """
     <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>
       <n0:SupplierBundleMaintainConfirmation_sync xmlns:n0="http://sap.com/xi/SAPGlobal20/Global">

@@ -202,7 +202,7 @@ public class SapByDesignErpClient : IErpClient
         if (supplier is null) return null;
 
         string? F(string name) => Local(supplier, name);
-        return new ErpVendorDto
+        var dto = new ErpVendorDto
         {
             Number = F("InternalID") ?? "",
             LegalName = F("FirstLineName") ?? F("FormattedName") ?? F("BusinessPartnerFormattedName") ?? "",
@@ -216,6 +216,62 @@ public class SapByDesignErpClient : IErpClient
             PrimaryEmail = F("EmailURI") ?? F("URI"),
             Tin = F("TaxID") ?? F("PartyTaxID"),
         };
+
+        // Payment method (PaymentData/PaymentForm/PaymentFormCode) drives whether the
+        // portal shows bank fields, so surface it as the mapped display value.
+        var payCode = F("PaymentFormCode");
+        if (!string.IsNullOrEmpty(payCode)) dto.PaymentMethod = MapPaymentForm(payCode);
+
+        // Active bank record = the one whose validity period covers today (SAP keeps
+        // superseded accounts as end-dated records). Surface its routing/account so the
+        // portal loads the current bank data.
+        var bank = SelectActiveBank(supplier);
+        if (bank is not null)
+        {
+            string? B(string n) => bank.Elements().FirstOrDefault(e => e.Name.LocalName == n)?.Value;
+            dto.RoutingNumber = B("BankRoutingID") ?? dto.RoutingNumber;
+            dto.AccountNumber = B("BankAccountID") ?? dto.AccountNumber;
+            var acctType = B("BankAccountTypeCode");
+            if (!string.IsNullOrEmpty(acctType)) dto.AccountType = MapAccountType(acctType);
+        }
+        return dto;
+    }
+
+    /// <summary>SAP PaymentFormCode → portal payment-method label. 06 = cheque, 05 = bank
+    /// transfer; anything else electronic falls back to ACH/EFT so bank fields still show.</summary>
+    private static string MapPaymentForm(string code) => code switch
+    {
+        "06" => "Check",
+        "05" => "ACH / EFT",
+        _ => "ACH / EFT",
+    };
+
+    /// <summary>SAP BankAccountTypeCode → portal account type (03 = current/checking).</summary>
+    private static string MapAccountType(string code) => code switch
+    {
+        "02" => "Savings",
+        _ => "Checking",
+    };
+
+    /// <summary>Picks the bank record whose validity period contains today; falls back to
+    /// the first record when none carry a validity period.</summary>
+    private static XElement? SelectActiveBank(XElement supplier)
+    {
+        var banks = supplier.Descendants().Where(e => e.Name.LocalName == "BankDetails").ToList();
+        if (banks.Count == 0) return null;
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        DateOnly? Bound(XElement b, string el) => ParseSapDate(b.Elements()
+            .FirstOrDefault(e => e.Name.LocalName == "ValidityPeriod")
+            ?.Elements().FirstOrDefault(e => e.Name.LocalName == el)?.Value);
+
+        var active = banks.FirstOrDefault(b =>
+        {
+            var start = Bound(b, "StartDate");
+            var end = Bound(b, "EndDate");
+            return (start is null || start <= today) && (end is null || end >= today);
+        });
+        return active ?? banks[0];
     }
 
     /// <summary>First descendant value with the given local element name (namespace-agnostic).</summary>
