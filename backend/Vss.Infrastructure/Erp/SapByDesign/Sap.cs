@@ -29,10 +29,15 @@ internal static class Sap
                     new XElement("LowerBoundaryIdentifier", internalId))),
             ProcessingConditions()));
 
-    public static string BuildMaintainBundle(string internalId, IReadOnlyDictionary<string, string?> fields)
+    /// <summary>
+    /// Builds a MaintainBundle_V1 update. Name (FirstLineName) sits directly on the
+    /// supplier bundle. Address + email/phone live under AddressInformation, which
+    /// ByDesign only accepts as a complete list (LCTI) and must carry the existing
+    /// address UUID so the in-use address is updated in place, not deleted/recreated.
+    /// Element order follows the WSDL schema sequence.
+    /// </summary>
+    public static string BuildMaintainBundle(string internalId, IReadOnlyDictionary<string, string?> fields, string? addressUuid = null)
     {
-        // Per the Manage WSDL, name fields (FirstLineName/SecondLineName) sit DIRECTLY on
-        // the supplier maintain bundle — there is no Organisation wrapper. actionCode 04 = update.
         var supplier = new XElement("Supplier",
             new XAttribute("actionCode", "04"),
             new XElement("InternalID", internalId));
@@ -40,9 +45,33 @@ internal static class Sap
         if (fields.TryGetValue("LegalName", out var name) && name is not null)
             supplier.Add(new XElement("FirstLineName", name));
 
-        // Address / contact / banking fields live under nested nodes (AddressInformation,
-        // CommunicationArrangement, PurchasingData, ...) each with their own actionCode.
-        // [TODO: map those against the Manage WSDL as needed — name is wired + verified.]
+        var address = new XElement("Address", new XAttribute("actionCode", "04"));
+        var postal = new XElement("PostalAddress");
+        void P(string field, string el)
+        {
+            if (fields.TryGetValue(field, out var v) && !string.IsNullOrEmpty(v)) postal.Add(new XElement(el, v));
+        }
+        // schema order: CountryCode, StreetName, CityName, RegionCode, StreetPostalCode
+        P("RemitCountry", "CountryCode");
+        P("RemitStreet", "StreetName");
+        P("RemitCity", "CityName");
+        P("RemitState", "RegionCode");
+        P("RemitZip", "StreetPostalCode");
+        if (postal.HasElements) address.Add(postal);
+        // Address-level: PostalAddress, Phone, EMailURI (in that order)
+        if (fields.TryGetValue("PrimaryPhone", out var phone) && !string.IsNullOrEmpty(phone))
+            address.Add(new XElement("PhoneFormattedNumberDescription", phone));
+        if (fields.TryGetValue("PrimaryEmail", out var email) && !string.IsNullOrEmpty(email))
+            address.Add(new XElement("EMailURI", email));
+
+        if (address.HasElements && !string.IsNullOrEmpty(addressUuid))
+        {
+            supplier.Add(new XAttribute("addressInformationListCompleteTransmissionIndicator", "true"));
+            supplier.Add(new XElement("AddressInformation",
+                new XAttribute("actionCode", "04"),
+                new XElement("UUID", addressUuid),
+                address));
+        }
 
         return Envelope(new XElement(Glob + "SupplierBundleMaintainRequest_sync_V1",
             new XElement("BasicMessageHeader"),

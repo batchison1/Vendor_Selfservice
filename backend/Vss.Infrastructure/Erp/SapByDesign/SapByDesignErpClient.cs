@@ -43,18 +43,39 @@ public class SapByDesignErpClient : IErpClient
             Sap.BuildQueryByInternalId(query.VendorNumber!), ct));
     }
 
+    private static readonly string[] AddressFields =
+        { "RemitCountry", "RemitStreet", "RemitCity", "RemitState", "RemitZip", "PrimaryEmail", "PrimaryPhone" };
+
     public async Task UpdateVendorMasterAsync(string vendorNumber, VendorMasterPatch patch, CancellationToken ct = default)
     {
+        var fields = new Dictionary<string, string?>(patch.Fields);
+        string? addressUuid = null;
+
+        // Address/email/phone changes must update the existing address in place, which
+        // needs the AddressInformation UUID + the full current postal address (LCTI).
+        if (AddressFields.Any(fields.ContainsKey))
+        {
+            var q = await PostAsync(_opt.QuerySupplierPath, Sap.QueryAction, Sap.BuildQueryByInternalId(vendorNumber), ct);
+            addressUuid = q.Descendants().FirstOrDefault(e => e.Name.LocalName == "AddressInformation")
+                ?.Elements().FirstOrDefault(e => e.Name.LocalName == "UUID")?.Value;
+
+            var current = ParseSupplier(q);
+            void Fill(string key, string? value) { if (!fields.ContainsKey(key) && !string.IsNullOrEmpty(value)) fields[key] = value; }
+            Fill("RemitCountry", current?.RemitCountry);
+            Fill("RemitStreet", current?.RemitStreet);
+            Fill("RemitCity", current?.RemitCity);
+            Fill("RemitState", current?.RemitState);
+            Fill("RemitZip", current?.RemitZip);
+        }
+
         var doc = await PostAsync(_opt.ManageSupplierPath, Sap.ManageAction,
-            Sap.BuildMaintainBundle(vendorNumber, patch.Fields), ct);
+            Sap.BuildMaintainBundle(vendorNumber, fields, addressUuid), ct);
 
         // MaximumLogItemSeverityCode "3" = error.
-        var severity = Local(doc.Root, "MaximumLogItemSeverityCode");
-        if (severity == "3")
-        {
-            var note = Local(doc.Root, "Note") ?? "unknown error";
-            throw new InvalidOperationException($"SAP ByDesign ManageSupplier for {vendorNumber} failed: {note}");
-        }
+        if (Local(doc.Root, "MaximumLogItemSeverityCode") == "3")
+            throw new InvalidOperationException(
+                $"SAP ByDesign ManageSupplier for {vendorNumber} failed: {Local(doc.Root, "Note") ?? "unknown error"}");
+
         _log.LogInformation("[SAP ByD] MaintainBundle supplier {Number} — {Fields}", vendorNumber, string.Join(", ", patch.Fields.Keys));
     }
 
